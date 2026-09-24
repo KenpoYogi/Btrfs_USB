@@ -43,6 +43,8 @@ namespace BtrfsUsbMounter.UI
         private bool allowShow;
         private bool started;
         private bool reallyExit;
+        private bool exitRequested;   // Close button / tray Exit; the title bar X only minimizes to the tray
+        private bool splitterDragging;
         private bool closeWhenIdle;
         private bool trayHintShown;
         private bool suppressEvents;
@@ -64,7 +66,8 @@ namespace BtrfsUsbMounter.UI
         private CheckBox chkAuto, chkExplorer, chkAllDisks, chkStartup;
         private SmoothListView list;
         private Label emptyLabel;
-        private Button btnMount, btnUnmount, btnOpen, btnShell, btnCopy, btnUnmountAll, btnRefresh, btnTools;
+        private Button btnMount, btnUnmount, btnOpen, btnShell, btnCopy, btnUnmountAll, btnRefresh, btnTools, btnClose;
+        private SplitContainer split;
         private TextBox logBox;
         private ToolStripStatusLabel statusLabel;
         private ToolStripProgressBar progress;
@@ -161,8 +164,9 @@ namespace BtrfsUsbMounter.UI
             };
             list.Controls.Add(emptyLabel);
 
-            // ---- buttons ----
-            var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(10, 8, 10, 6) };
+            // ---- buttons (Close on the right; the rest wrap to a second row when the window is narrow) ----
+            var bar = new Panel { Dock = DockStyle.Bottom, Height = 46, Padding = new Padding(10, 8, 10, 6) };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty };
             btnMount = UiKit.MakeButton("Mount", 100);
             btnUnmount = UiKit.MakeButton("Unmount / Eject", 130);
             btnOpen = UiKit.MakeButton("Open in Explorer", 130);
@@ -171,13 +175,24 @@ namespace BtrfsUsbMounter.UI
             btnUnmountAll = UiKit.MakeButton("Unmount all", 110);
             btnRefresh = UiKit.MakeButton("Refresh", 90);
             btnTools = UiKit.MakeButton("Drive tools...", 115);
-            bar.Controls.AddRange(new Control[] { btnMount, btnUnmount, btnOpen, btnShell, btnCopy, btnUnmountAll, btnRefresh, btnTools });
+            buttons.Controls.AddRange(new Control[] { btnMount, btnUnmount, btnOpen, btnShell, btnCopy, btnUnmountAll, btnRefresh, btnTools });
+            btnClose = UiKit.MakeButton("Close", 90);
+            btnClose.Margin = Padding.Empty;
+            tips.SetToolTip(btnClose, "Exit the program. The X in the title bar only minimizes it to the tray.");
+            var closeHost = new Panel { Dock = DockStyle.Right, Width = btnClose.Width };
+            closeHost.Controls.Add(btnClose);
+            bar.Controls.Add(buttons);
+            bar.Controls.Add(closeHost);
+            buttons.SizeChanged += (s, e) =>
+            {
+                int needed = buttons.GetPreferredSize(new Size(buttons.Width, 0)).Height + bar.Padding.Vertical;
+                if (buttons.Width > 0 && needed != bar.Height) bar.Height = Math.Max(needed, btnClose.Height + bar.Padding.Vertical);
+            };
 
             // ---- log ----
             logBox = new TextBox
             {
-                Dock = DockStyle.Bottom,
-                Height = 170,
+                Dock = DockStyle.Fill,
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
@@ -193,12 +208,31 @@ namespace BtrfsUsbMounter.UI
             statusLabel = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
             status.Items.AddRange(new ToolStripItem[] { progress, cancelTask, statusLabel });
 
-            Controls.Add(list);
-            Controls.Add(top);
-            Controls.Add(bar);
-            Controls.Add(logBox);
-            Controls.Add(status);
+            // ---- drive list + buttons above, log below; the splitter between them is draggable ----
+            split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                FixedPanel = FixedPanel.Panel2,   // resizing the window resizes the drive list, the log keeps its height
+                TabStop = false
+            };
+            split.Panel1.Controls.Add(list);
+            split.Panel1.Controls.Add(bar);
             list.BringToFront();
+            split.Panel2.Controls.Add(logBox);
+            split.SplitterMoving += (s, e) => splitterDragging = true;   // raised by the user only, not by window resizes
+            split.SplitterMoved += (s, e) =>
+            {
+                if (!splitterDragging) return;
+                splitterDragging = false;
+                int logHeight = (int)Math.Round(split.Panel2.Height / (CurrentAutoScaleDimensions.Height / 96f));
+                engine.State.UpdateSettings(x => x.LogHeight = logHeight);
+            };
+
+            Controls.Add(split);
+            Controls.Add(top);
+            Controls.Add(status);
+            split.BringToFront();
 
             // ---- drive tools menu (button and right-click) ----
             toolsMenu = new ContextMenuStrip();
@@ -314,7 +348,8 @@ namespace BtrfsUsbMounter.UI
             tray.DoubleClick += (s, e) => ShowMainWindow();
             trayOpen.Click += (s, e) => ShowMainWindow();
             trayUnmountAll.Click += (s, e) => RequestUnmountAll(false);
-            trayExit.Click += (s, e) => Close();
+            trayExit.Click += (s, e) => RequestExit();
+            btnClose.Click += (s, e) => RequestExit();
 
             Resize += (s, e) =>
             {
@@ -322,7 +357,7 @@ namespace BtrfsUsbMounter.UI
                 Hide();
                 if (!trayHintShown)
                 {
-                    ShowBalloon(UiKit.AppName, "Still watching for btrfs USB drives. Double-click this icon to reopen.", ToolTipIcon.Info);
+                    ShowBalloon(UiKit.AppName, "Still watching for USB drives. Double-click this icon to reopen; right-click it > Exit to quit.", ToolTipIcon.Info);
                     trayHintShown = true;
                 }
             };
@@ -343,6 +378,34 @@ namespace BtrfsUsbMounter.UI
                 if (!IsHandleCreated) CreateHandle();
             }
             base.SetVisibleCore(value);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            ApplySplitLayout();
+        }
+
+        /// <summary>Sizes the log pane: the height the user last dragged it to, or 170 px (both at 96 dpi).</summary>
+        private void ApplySplitLayout()
+        {
+            float scale = CurrentAutoScaleDimensions.Height / 96f;
+            split.SplitterWidth = Math.Max(4, (int)Math.Round(6 * scale));
+            split.Panel1MinSize = (int)Math.Round(140 * scale);
+            split.Panel2MinSize = (int)Math.Round(60 * scale);
+            int saved = engine.State.Settings.LogHeight;
+            int logHeight = (int)Math.Round((saved > 0 ? saved : 170) * scale);
+            int maxLog = split.Height - split.SplitterWidth - split.Panel1MinSize;
+            if (maxLog < split.Panel2MinSize) return;   // window too small to honour both minimums
+            logHeight = Math.Max(split.Panel2MinSize, Math.Min(logHeight, maxLog));
+            split.SplitterDistance = split.Height - split.SplitterWidth - logHeight;
+        }
+
+        /// <summary>Close button and tray Exit: really exit (OnFormClosing still asks about mounted drives).</summary>
+        private void RequestExit()
+        {
+            exitRequested = true;
+            Close();
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -494,12 +557,19 @@ namespace BtrfsUsbMounter.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            Log.Debug(string.Format("Window closing requested ({0}; exit {1}, jobs idle {2}, mounted {3}).",
-                e.CloseReason, reallyExit, jobs.IsIdle, engine.State.MountCount));
+            Log.Debug(string.Format("Window closing requested ({0}; exit {1}, exit requested {2}, jobs idle {3}, mounted {4}).",
+                e.CloseReason, reallyExit, exitRequested, jobs.IsIdle, engine.State.MountCount));
             if (reallyExit || e.CloseReason == CloseReason.WindowsShutDown)
             {
                 Cleanup();
                 base.OnFormClosing(e);
+                return;
+            }
+            if (e.CloseReason == CloseReason.UserClosing && !exitRequested)
+            {
+                // title bar X, Alt+F4, taskbar "Close window": keep running in the tray
+                e.Cancel = true;
+                WindowState = FormWindowState.Minimized;   // the Resize handler hides the window
                 return;
             }
             if (!jobs.IsIdle)
@@ -518,7 +588,7 @@ namespace BtrfsUsbMounter.UI
                     return;
                 }
                 closeWhenIdle = true;
-                Log.Info(string.Format("Will close after '{0}' finishes. Close again to force quit.", name));
+                Log.Info(string.Format("Will close after '{0}' finishes. Click Close again to force quit.", name));
                 return;
             }
             int n = engine.State.MountCount;
@@ -531,6 +601,7 @@ namespace BtrfsUsbMounter.UI
                 if (answer == DialogResult.Cancel)
                 {
                     e.Cancel = true;
+                    exitRequested = false;
                     return;
                 }
                 if (answer == DialogResult.Yes)

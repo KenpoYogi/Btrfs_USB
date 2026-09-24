@@ -130,6 +130,15 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - No `btrfs check --repair` feature by design
 - state.json must stay compatible with the PowerShell version's field names
 
+## Status docs (RESUME.md + STATUS.md)
+Same convention as VariableDrive / FeatureRecognition: two files at the repo root, split by edit frequency.
+- `RESUME.md`: the live "START HERE" resume, rewritten after every change, under about 120 lines. A fresh session
+  reads it first. Banner: state (last commit, uncommitted work, built vs run), the next step; then goal, state,
+  files this turn, what changed, run list, closed / do not retry, owed
+- `STATUS.md`: append-only trail, one entry per commit, newest first, each naming its evidence. Prepend; never
+  rewrite or truncate. An entry goes in with its own commit, headed `(this commit)`; the next change puts the hash in
+- If either looks reverted or shrunk on disk: `git checkout HEAD -- RESUME.md STATUS.md`
+
 ## Verification done before handover
 Compiles against the 4.8 reference assemblies; 32 core tests passed under Mono (superblock
 parser on a real btrfs image, btrfs output parsers, argument quoting, PowerShell-format

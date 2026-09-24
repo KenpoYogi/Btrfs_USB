@@ -26,6 +26,8 @@ namespace BtrfsUsbMounter.Core
         [DataMember] public string Options { get; set; }
         /// <summary>Mount APFS read/write with the experimental linux-apfs-rw driver (default: read-only).</summary>
         [DataMember] public bool ApfsWrite { get; set; }
+        /// <summary>Height of the log pane in 96-dpi pixels, set by dragging the splitter (0 = default).</summary>
+        [DataMember] public int LogHeight { get; set; }
 
         public AppSettings()
         {
@@ -46,6 +48,7 @@ namespace BtrfsUsbMounter.Core
             ShowAllDisks = false;
             Options = string.Empty;
             ApfsWrite = false;
+            LogHeight = 0;
         }
 
         public AppSettings Clone()
