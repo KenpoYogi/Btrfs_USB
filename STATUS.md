@@ -8,7 +8,17 @@
 
 ---
 
-## ⭐ (this commit) — **MAIN WINDOW: DRAGGABLE SPLITTER, X MINIMIZES TO THE TRAY, CLOSE BUTTON EXITS.** _2026-09-24. Evidence: user request ("both upper and lower panes resizeable", "the top right x also minimizes the window, not closes", "add a Close button on the bottom right"). `dotnet build -c Release`: succeeded, 0 warnings. **Not yet run** (needs an elevated session)._
+## ⭐ (this commit) — **THE SPLITTER CAN BE SEEN, AND THE LOG STARTS BIG: THE UPPER PANE AT HALF ITS OLD HEIGHT.** _2026-09-24. Evidence: the user ran `a0d162d` at 16:26 — the log shows X → tray (16:27:00, `exit requested False`) and Close → exit (16:27:03, `True`) working — but `state.json` kept `LogHeight: 0`: the splitter was never dragged. It was an unmarked 6 px strip in the window colour. User: "vertically resize the upper and lower panes; the upper pane initially 50% smaller, the lower gets the extra space". `dotnet build -c Release`: succeeded. **Not yet run.**_
+
+- **Visible splitter:** 8 px (96 dpi), a line along each edge and nine grip dots in the middle (`OnPaintSplitter`,
+  repainted on move and resize); tooltip "Drag to resize the drive list and the log." over the bar.
+- **Default split:** the drive list + buttons get half of what a 170 px log left them; the log gets the rest (about
+  190 / 360 px in the default 1100 × 680 window). A dragged height (`LogHeight` > 0) still wins.
+- **Files.** `src/UI/MainForm.cs`.
+
+---
+
+## ⭐ a0d162d — **MAIN WINDOW: DRAGGABLE SPLITTER, X MINIMIZES TO THE TRAY, CLOSE BUTTON EXITS.** _2026-09-24. Evidence: user request ("both upper and lower panes resizeable", "the top right x also minimizes the window, not closes", "add a Close button on the bottom right"). `dotnet build -c Release`: succeeded, 0 warnings. **Not yet run** (needs an elevated session)._
 
 - **SplitContainer** between the drive list (+ button bar) and the log; `FixedPanel = Panel2`, minimums 140 / 60 px at
   96 dpi, default log 170 px. `ApplySplitLayout()` in `OnLoad` (fires on first show, also when started in the tray).

@@ -227,7 +227,11 @@ namespace BtrfsUsbMounter.UI
                 splitterDragging = false;
                 int logHeight = (int)Math.Round(split.Panel2.Height / (CurrentAutoScaleDimensions.Height / 96f));
                 engine.State.UpdateSettings(x => x.LogHeight = logHeight);
+                split.Invalidate();
             };
+            split.Resize += (s, e) => split.Invalidate();
+            split.Paint += OnPaintSplitter;
+            tips.SetToolTip(split, "Drag to resize the drive list and the log.");   // shown over the splitter bar only
 
             Controls.Add(split);
             Controls.Add(top);
@@ -386,19 +390,46 @@ namespace BtrfsUsbMounter.UI
             ApplySplitLayout();
         }
 
-        /// <summary>Sizes the log pane: the height the user last dragged it to, or 170 px (both at 96 dpi).</summary>
+        /// <summary>
+        /// Sizes the log pane: the height the user last dragged it to (96 dpi), or by default half of what a 170 px log
+        /// would leave for the drive list, the log getting the rest.
+        /// </summary>
         private void ApplySplitLayout()
         {
             float scale = CurrentAutoScaleDimensions.Height / 96f;
-            split.SplitterWidth = Math.Max(4, (int)Math.Round(6 * scale));
+            split.SplitterWidth = Math.Max(6, (int)Math.Round(8 * scale));
             split.Panel1MinSize = (int)Math.Round(140 * scale);
             split.Panel2MinSize = (int)Math.Round(60 * scale);
             int saved = engine.State.Settings.LogHeight;
-            int logHeight = (int)Math.Round((saved > 0 ? saved : 170) * scale);
+            int available = split.Height - split.SplitterWidth;
+            int logHeight = saved > 0
+                ? (int)Math.Round(saved * scale)
+                : available - (available - (int)Math.Round(170 * scale)) / 2;
             int maxLog = split.Height - split.SplitterWidth - split.Panel1MinSize;
             if (maxLog < split.Panel2MinSize) return;   // window too small to honour both minimums
             logHeight = Math.Max(split.Panel2MinSize, Math.Min(logHeight, maxLog));
             split.SplitterDistance = split.Height - split.SplitterWidth - logHeight;
+        }
+
+        /// <summary>Draws the splitter bar with a row of grip dots, so it can be seen and grabbed.</summary>
+        private void OnPaintSplitter(object sender, PaintEventArgs e)
+        {
+            Rectangle r = split.SplitterRectangle;
+            float scale = CurrentAutoScaleDimensions.Height / 96f;
+            int dot = Math.Max(2, (int)Math.Round(2 * scale));
+            int step = dot * 2;
+            const int dots = 9;
+            int x = r.Left + (r.Width - (dots * step - dot)) / 2;
+            int y = r.Top + (r.Height - dot) / 2;
+            using (var pen = new Pen(SystemColors.ControlDark))
+            {
+                e.Graphics.DrawLine(pen, r.Left, r.Top, r.Right, r.Top);
+                e.Graphics.DrawLine(pen, r.Left, r.Bottom - 1, r.Right, r.Bottom - 1);
+            }
+            using (var brush = new SolidBrush(SystemColors.ControlDarkDark))
+            {
+                for (int i = 0; i < dots; i++) e.Graphics.FillRectangle(brush, x + i * step, y, dot, dot);
+            }
         }
 
         /// <summary>Close button and tray Exit: really exit (OnFormClosing still asks about mounted drives).</summary>

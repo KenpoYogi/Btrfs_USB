@@ -1,11 +1,11 @@
 # ▶ START HERE — Btrfs USB Mounter resume
 
-**⭐ COMMITTED AND PUSHED TO `origin/main` (2026-09-24): MAIN WINDOW LAYOUT — DRAGGABLE SPLITTER BETWEEN THE DRIVE LIST AND THE LOG, TITLE-BAR X
-MINIMIZES TO THE TRAY, NEW "Close" BUTTON BOTTOM RIGHT THAT REALLY EXITS.** `dotnet build -c Release` succeeds, 0 warnings.
-**Not yet run** — the GUI needs an elevated session. It is the commit after `876d770` (apt driver build, tested on Kali).
+**⭐ COMMITTED AND PUSHED TO `origin/main` (2026-09-24): THE SPLITTER IS NOW VISIBLE (GRIP DOTS, 8 PX) AND THE LOG STARTS BIG — THE DRIVE LIST AT
+HALF ITS OLD HEIGHT.** Builds clean. **Not yet run.** On top of `a0d162d` (pushed): draggable splitter, X → tray, Close button.
+The user's 16:26 run of `a0d162d` confirmed X → tray and Close → exit; the splitter was never dragged (`LogHeight` stayed 0).
 
-_**Next: ① run `bin\Release\net48\BtrfsUsbMounter.exe` elevated and check the three changes** (user): drag the splitter both
-ways, restart and see the log height remembered; X, Alt+F4 and taskbar "Close window" go to the tray; Close with a drive
+_**Next: ① run `bin\Release\net48\BtrfsUsbMounter.exe` elevated and check** (user): the drive list about half its old
+height and the log larger; the grip dots on the bar between them; drag it both ways, restart and see the height remembered; X, Alt+F4 and taskbar "Close window" go to the tray; Close with a drive
 mounted asks Yes/No/Cancel, and Cancel then X still only minimizes; narrow the window to ~880 px and see the buttons wrap
 to a second row. **② Fix what ① finds.** **③ The real-hardware run** (run list ③)._
 
@@ -17,21 +17,25 @@ to a second row. **② Fix what ① finds.** **③ The real-hardware run** (run 
 > **Now:** usability of the main window (user requests, 2026-09-24).
 
 > ### 2. STATE
-> **Committed:** the window-layout change, on top of `876d770`; pushed to `origin/main` (github.com/KenpoYogi/Btrfs_USB). Builds clean.
+> **Committed and pushed to `origin/main`** (github.com/KenpoYogi/Btrfs_USB): the visible splitter and the new default split, on
+> top of `a0d162d` (window layout). Builds clean. Working tree clean.
 > **Build output:** `bin\Release\net48\` — `BtrfsUsbMounter.exe` (+ `.exe.config`), `BtrfsUsbMounter.com` for terminals,
 > `LICENSE`, `tools\build-wsl-modules.sh`. Runs elevated only (`requireAdministrator`).
 > **WSL kernel:** 6.18.33.2-microsoft-standard-WSL2. Drivers built and loading in openSUSE-Tumbleweed and kali-linux.
 > **Verified:** driver build and loop-device tests on 6.18 in both distros (see CLAUDE.md). **Never verified:** the app
-> mounting a real USB disk end to end, a real `wsl --shutdown` with drives mounted, the new window layout.
+> mounting a real USB disk end to end, a real `wsl --shutdown` with drives mounted, dragging the splitter. **Seen working (user run
+> 16:26):** X → tray, Close → exit.
 
 > ### 3. FILES THIS TURN
-> `src/UI/MainForm.cs` (SplitContainer, button bar as Panel + wrapping FlowLayoutPanel + Close, `RequestExit`, `ApplySplitLayout`
-> in `OnLoad`, X → minimize in `OnFormClosing`) · `src/Core/Models.cs` (`AppSettings.LogHeight`) · `RESUME.md`, `STATUS.md` (new) ·
-> `CLAUDE.md` (status docs section).
+> `src/UI/MainForm.cs` (`OnPaintSplitter`, splitter tooltip, `ApplySplitLayout` default) · `STATUS.md` (new entry; `a0d162d`'s hash) ·
+> this file.
 
 > ### 4. WHAT CHANGED
+> · **This turn: the splitter can be seen** — 8 px, edge lines and nine grip dots, a tooltip over it. **Default split:** the drive list gets
+>   half of what a 170 px log used to leave it, the log the rest (≈ 190 / 360 px at 1100 × 680). A dragged height still wins.
+> · _In `a0d162d`:_
 > · **Splitter.** `SplitContainer`, horizontal, `FixedPanel = Panel2`: a window resize changes the drive list, the log keeps its
->   height. Panel1 = drive list + button bar, Panel2 = log. Minimums 140 / 60 px (96 dpi, scaled). Default log 170 px.
+>   height. Panel1 = drive list + button bar, Panel2 = log. Minimums 140 / 60 px (96 dpi, scaled).
 > · **Remembered log height.** Saved on a user drag only (`SplitterMoving` sets a flag, `SplitterMoved` saves), in 96-dpi pixels,
 >   as `state.json` `Settings.LogHeight` (0 = default). A new field; older state files and the PowerShell version still load.
 > · **X = minimize.** `CloseReason.UserClosing` without `exitRequested` → cancel + minimize (the Resize handler hides to the tray).
