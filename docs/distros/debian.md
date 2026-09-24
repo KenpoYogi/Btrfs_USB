@@ -10,7 +10,7 @@ Debian is a stable, conservative distro. It handles btrfs, ext and XFS drives, a
 | JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
 | ReiserFS, Reiser4 | No (detected only) |
 
-**Tools > Build filesystem drivers** needs openSUSE. For the extra filesystems, install openSUSE
+**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For the extra filesystems, install openSUSE
 Tumbleweed next to Debian and pick it in the app. Debian's `zfsutils-linux` package alone is not
 enough: the WSL kernel has no ZFS driver.
 
@@ -137,7 +137,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Mac drive fails with "No sub system to mount APFS format" | Your `libfsapfs-utils` lacks FUSE (testing/unstable): `apt remove -y libfsapfs-utils`, then use openSUSE Tumbleweed for Mac drives |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `apt install -y libfsapfs-utils` (Debian 13), then click **Refresh**. ZFS: use openSUSE Tumbleweed |
-| Status says *No driver* | That filesystem needs the extra drivers, which need openSUSE: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister Debian`. Your USB drives are not

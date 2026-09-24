@@ -10,7 +10,7 @@ Fedora uses btrfs itself, so btrfs drives are well supported. Fedora has no pack
 | JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
 | ReiserFS, Reiser4 | No (detected only) |
 
-**Tools > Build filesystem drivers** needs openSUSE. For Mac drives or the extra filesystems, install
+**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For Mac drives or the extra filesystems, install
 openSUSE Tumbleweed next to Fedora and pick it in the app. Fedora's `apfs-fuse` package is a different
 tool that Btrfs USB Mounter does not use.
 
@@ -124,7 +124,7 @@ To test from the command line, open an administrator terminal in the program fol
 | The distro box is empty | Run `wsl -l -v`. The distro must show `VERSION 2`; run `wsl --set-version FedoraLinux-44 2` |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac and ZFS drives need another distro: openSUSE Tumbleweed does both |
-| Status says *No driver* | That filesystem needs the extra drivers, which need openSUSE: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister FedoraLinux-44`. Your USB drives

@@ -13,7 +13,7 @@ btrfs tools without any trouble.
 **Don't install `libfsapfs-utils` on Kali.** Its `fsapfsmount` exists but only prints *"No sub system
 to mount APFS format"*, and because the command is there the app would show Mac drives as ready.
 
-**Tools > Build filesystem drivers** needs openSUSE. For Mac drives or the extra filesystems, install
+**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For Mac drives or the extra filesystems, install
 openSUSE Tumbleweed next to Kali and pick it in the app.
 
 WSL install name: **`kali-linux`**
@@ -133,7 +133,7 @@ To test from the command line, open an administrator terminal in the program fol
 | `apt update` fails with a signature (key) error | Kali's archive key changed: follow the key update steps on [kali.org](https://www.kali.org/docs/), then retry |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac and ZFS drives need another distro: openSUSE Tumbleweed does both |
-| Status says *No driver* | That filesystem needs the extra drivers, which need openSUSE: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister kali-linux`. Your USB drives are

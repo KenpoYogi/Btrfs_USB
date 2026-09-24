@@ -15,7 +15,7 @@ Ubuntu is the most common WSL distro and a good choice for btrfs, ext and XFS dr
 | JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) | No |
 | ReiserFS, Reiser4 | No (detected only) | No |
 
-**Tools > Build filesystem drivers** needs openSUSE. If you need JFS, HFS+, ZFS or APFS read/write,
+**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). If you need JFS, HFS+, ZFS or APFS read/write,
 install openSUSE Tumbleweed next to Ubuntu and pick it in the app. Ubuntu's `zfsutils-linux` package
 alone is not enough: the WSL kernel has no ZFS driver.
 
@@ -135,7 +135,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Mac drive fails with "No sub system to mount APFS format" | You are on Ubuntu 26.04, whose package lacks FUSE. Use `Ubuntu-24.04` or openSUSE Tumbleweed |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: on 24.04 `apt install -y libfsapfs-utils`, then click **Refresh**; on 26.04 use `Ubuntu-24.04` or openSUSE Tumbleweed. ZFS: use openSUSE Tumbleweed |
-| Status says *No driver* | That filesystem needs the extra drivers, which need openSUSE: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister Ubuntu-24.04`. Your USB drives

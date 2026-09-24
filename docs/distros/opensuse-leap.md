@@ -1,14 +1,15 @@
 # Btrfs USB Mounter with openSUSE Leap
 
-openSUSE Leap is the stable, fixed-release openSUSE. Everyday mounting works well. For the extra
-drivers (JFS, HFS+, ZFS, APFS read/write) use [openSUSE Tumbleweed](opensuse-tumbleweed.md) instead:
-the driver build is only tested there.
+openSUSE Leap is the stable, fixed-release openSUSE. Everyday mounting works well. Leap 16.0 has
+everything the extra drivers (JFS, HFS+, ZFS, APFS read/write) need: `gcc13` in its own repositories
+and ZFS tools in openSUSE's *filesystems* repository. The driver build is only tested on
+[openSUSE Tumbleweed](opensuse-tumbleweed.md), though.
 
 | What you want to open | Works on Leap 16.0? |
 |---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | Not tested; use Tumbleweed (see [Extra drivers](#extra-drivers)) |
+| JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 WSL install name: **`openSUSE-Leap-16.0`**
@@ -89,32 +90,59 @@ zypper install -y btrfsprogs util-linux kmod libfsapfs
 | `libfsapfs` | Optional: read-only access to Mac (APFS) drives with `fsapfsmount` |
 | `e2fsprogs`, `xfsprogs` | Optional: check or repair ext and XFS drives by hand (`fsck.ext4`, `xfs_repair`) |
 
+### Optional: the *filesystems* repository (ZFS and more tools)
+
+openSUSE's *filesystems* repository has a Leap 16.0 build with the ZFS tools (`zpool`, `zfs`) and
+check tools for JFS and APFS drives. It is a community repository from the openSUSE Build Service.
+Add it once:
+
+```sh
+zypper addrepo https://download.opensuse.org/repositories/filesystems/16.0/ filesystems
+zypper --gpg-auto-import-keys refresh
+zypper install -y zfs jfsutils apfsprogs
+```
+
+| Package | Why |
+|---|---|
+| `zfs` | For ZFS drives: `zpool` imports and exports the pool (the ZFS driver itself comes from [Extra drivers](#extra-drivers)) |
+| `jfsutils` | Optional: check or repair JFS drives by hand (`fsck.jfs`) |
+| `apfsprogs` | Optional: check APFS drives by hand (`fsck.apfs`) |
+
+`zfs` also pulls in `kernel-default` and `zfs-kmp-default`. They are built for openSUSE's own
+kernel, which WSL never starts, so they do nothing, but they must stay installed because `zfs`
+depends on them.
+
 Type `exit` to leave the root shell.
 
 ### Extra drivers
 
-**Tools > Build filesystem drivers** (JFS, HFS+, ZFS, APFS read/write) is only tested on Tumbleweed.
-It needs the same GCC version that built the WSL kernel. If Leap doesn't have that version, the script
-fetches one built for Tumbleweed, which may not install on Leap.
+The WSL kernel from Microsoft has no drivers for JFS, HFS+, ZFS or APFS read/write, so Btrfs USB
+Mounter compiles them: **Tools > Build filesystem drivers**. Leap 16.0 has what the build needs.
+The compiler is `gcc13` from Leap's own repositories. For ZFS, install `zfs` from the *filesystems*
+repository first (above). **This is tested on Tumbleweed only.** If it fails on Leap, please report it
+with `mounter.log`. As a fallback you can install Tumbleweed next to Leap
+(`wsl --install -d openSUSE-Tumbleweed`, see the [Tumbleweed guide](opensuse-tumbleweed.md)) and pick
+it in the app.
 
-If you need these filesystems, install Tumbleweed next to Leap (`wsl --install -d openSUSE-Tumbleweed`,
-see the [Tumbleweed guide](opensuse-tumbleweed.md)) and pick it in the app. Both distros can stay
-installed.
+1. In Btrfs USB Mounter choose **Tools > Build filesystem drivers**.
+2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in the distro.
+3. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
 
-For ZFS the `zpool` tool comes from the *filesystems* repository for Leap 16.0:
-`https://download.opensuse.org/repositories/filesystems/16.0/`.
+The drivers survive WSL restarts (the app puts them back when needed). **Run the build again after
+every `wsl --update`**: a new WSL kernel needs its own build.
 
 ## Step 4: Check the setup
 
 Paste this into the root shell (`wsl -d openSUSE-Leap-16.0 -u root`):
 
 ```sh
-for c in btrfs blkid modinfo fsapfsmount; do
+for c in btrfs blkid modinfo fsapfsmount zpool; do
   command -v $c >/dev/null && echo "OK       $c" || echo "missing  $c"
 done
 ```
 
-`btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` only matters for Mac drives.
+`btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` (Mac drives) and `zpool` (ZFS) only
+matter if you installed those options.
 
 ## Step 5: Use it with Btrfs USB Mounter
 
@@ -136,7 +164,8 @@ To test from the command line, open an administrator terminal in the program fol
 |---|---|
 | The distro box is empty | Run `wsl -l -v`. The distro must show `VERSION 2`; run `wsl --set-version openSUSE-Leap-16.0 2` |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfsprogs` |
-| Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`, then click **Refresh**. ZFS: see [Extra drivers](#extra-drivers) |
+| Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`; ZFS: install `zfs` from the *filesystems* repository (Step 3). Then click **Refresh** |
+| `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Status says *No driver* | That filesystem needs the extra drivers: see [Extra drivers](#extra-drivers) |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

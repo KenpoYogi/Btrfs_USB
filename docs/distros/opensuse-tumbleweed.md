@@ -112,8 +112,9 @@ The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter com
    downloads the WSL kernel source (about 250 MB), OpenZFS and linux-apfs-rw.
 3. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
 
-**Run it again after every `wsl --update`**: a new WSL kernel needs its own build. Later runs are
-quicker.
+The drivers survive WSL and Windows restarts: they are kept on the distro's disk and the app puts
+them back when needed. **Run the build again after every `wsl --update`**: a new WSL kernel needs its
+own build. Later runs are quicker.
 
 Type `exit` to leave the root shell.
 

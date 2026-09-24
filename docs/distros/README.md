@@ -6,13 +6,15 @@ Microsoft's WSL kernel, which is the same for every distro. The distro supplies 
 runs, like `btrfs`, `blkid` and `fsapfsmount`. That is why some features depend on the distro.
 
 **Not sure? Pick [openSUSE Tumbleweed](opensuse-tumbleweed.md).** It is the distro the app is
-developed and tested on, and the only one where every feature works.
+developed and tested on, and the only one where every feature is tested. Leap and SLES have
+everything the extra drivers need too, including openSUSE's *filesystems* repository for the ZFS
+tools, but the driver build is untested there.
 
 | Distro | Guide | btrfs, ext, XFS | Mac (APFS) read-only | Extra drivers (JFS, HFS+, ZFS, APFS read/write) |
 |---|---|---|---|---|
 | openSUSE Tumbleweed | [opensuse-tumbleweed.md](opensuse-tumbleweed.md) | Yes (tested) | Yes | Yes |
-| openSUSE Leap 16.0 | [opensuse-leap.md](opensuse-leap.md) | Yes | Yes | Not tested |
-| SUSE Linux Enterprise Server | [sles.md](sles.md) | Yes (needs registration for most packages) | Yes, via Package Hub | No |
+| openSUSE Leap 16.0 | [opensuse-leap.md](opensuse-leap.md) | Yes | Yes | Should work (not tested) |
+| SUSE Linux Enterprise Server | [sles.md](sles.md) | Yes (needs registration for most packages) | Yes, via Package Hub | Should work (not tested) |
 | Ubuntu 24.04 | [ubuntu.md](ubuntu.md) | Yes | Yes | No |
 | Ubuntu 26.04 (plain `Ubuntu`) | [ubuntu.md](ubuntu.md) | Yes | No (package lacks FUSE) | No |
 | Fedora | [fedora.md](fedora.md) | Yes | No | No |
@@ -44,5 +46,6 @@ ReiserFS, and current WSL kernels are newer than that.
   supported).
 - **Only WSL 2 works.** WSL 1 has no real Linux kernel. `wsl -l -v` shows the version;
   `wsl --set-version <name> 2` converts a distro.
-- **After `wsl --update`** you get a new WSL kernel. On openSUSE, rerun **Tools > Build filesystem
-  drivers** afterwards; nothing else needs to change.
+- **After `wsl --update`** you get a new WSL kernel. On openSUSE or SLES, rerun **Tools > Build
+  filesystem drivers** afterwards; nothing else needs to change. Ordinary WSL or Windows restarts
+  don't matter: the built drivers are kept on the distro's disk and the app puts them back.

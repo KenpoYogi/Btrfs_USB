@@ -6,14 +6,15 @@ SLES is SUSE's commercial distro. It works well for btrfs, ext and XFS drives. T
   subscription, or a free 60-day trial from [suse.com](https://www.suse.com/download/sles/).
   Without registration, SLES 15 SP7 can still install the required packages from the free *SLE_BCI*
   repository included with the WSL image. SLES 16.0 without registration is not verified.
-- **No extra drivers.** **Tools > Build filesystem drivers** needs openSUSE. If you need JFS, HFS+,
-  ZFS or APFS read/write, install [openSUSE Tumbleweed](opensuse-tumbleweed.md) next to SLES.
+- **Extra drivers: possible, not tested.** SLES has `gcc13`, which the driver build needs, and the ZFS
+  tools come from openSUSE's *filesystems* repository, which also has SLES-compatible builds. The
+  build is only tested on [openSUSE Tumbleweed](opensuse-tumbleweed.md), though.
 
 | What you want to open | Works on SLES? |
 |---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` from SUSE Package Hub (needs registration) |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | No; use openSUSE Tumbleweed |
+| JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 WSL install names: **`SUSE-Linux-Enterprise-16.0`** or **`SUSE-Linux-Enterprise-15-SP7`**
@@ -121,19 +122,72 @@ zypper refresh
 zypper install -y libfsapfs
 ```
 
+### Optional: the *filesystems* repository (ZFS and more tools)
+
+openSUSE's *filesystems* repository (a community repository from the openSUSE Build Service, not
+supported by SUSE) has builds for SLES too. It provides the ZFS tools (`zpool`, `zfs`) and check
+tools for JFS and APFS drives. Pick the folder for your SLES version:
+
+| SLES version | Repository |
+|---|---|
+| 16.0 | `https://download.opensuse.org/repositories/filesystems/16.0/` |
+| 15 SP7 | `https://download.opensuse.org/repositories/filesystems/15.7/` (the Leap 15.7 build, same code base as SLES 15 SP7) |
+
+For SLES 15 SP7 replace `16.0` with `15.7` in the first command:
+
+```sh
+zypper addrepo https://download.opensuse.org/repositories/filesystems/16.0/ filesystems
+zypper --gpg-auto-import-keys refresh
+zypper install -y zfs jfsutils apfsprogs
+```
+
+| Package | Why |
+|---|---|
+| `zfs` | For ZFS drives: `zpool` imports and exports the pool (the ZFS driver itself comes from [Extra drivers](#extra-drivers)) |
+| `jfsutils` | Optional: check or repair JFS drives by hand (`fsck.jfs`) |
+| `apfsprogs` | Optional: check APFS drives by hand (`fsck.apfs`) |
+
+`zfs` also pulls in `kernel-default` and `zfs-kmp-default`. They are for a normal SLES kernel, which
+WSL never starts, so they do nothing, but they must stay installed because `zfs` depends on them.
+
 Type `exit` to leave the root shell.
+
+### Extra drivers
+
+The WSL kernel from Microsoft has no drivers for JFS, HFS+, ZFS or APFS read/write, so Btrfs USB
+Mounter compiles them: **Tools > Build filesystem drivers**. **This is tested on openSUSE Tumbleweed
+only.** It should work on SLES because the pieces it needs exist there:
+
+- **A registered system.** The build installs compilers and development packages with `zypper`.
+- **`gcc13`**, the compiler version that built the WSL kernel. On SLES 16.0 it is in the base
+  product. On SLES 15 SP7 turn on the free *Development Tools* module first:
+  `SUSEConnect -p sle-module-development-tools/15.7/x86_64`.
+- **For ZFS:** the `zfs` package from the *filesystems* repository (above).
+
+Then:
+
+1. In Btrfs USB Mounter choose **Tools > Build filesystem drivers**.
+2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in the distro.
+3. The log ends with *Filesystem drivers built and installed for this WSL kernel.* If a package is
+   missing, the log says which one.
+
+The drivers survive WSL restarts (the app puts them back when needed). **Run the build again after
+every `wsl --update`**: a new WSL kernel needs its own build. If the build fails on SLES, please report
+it with `mounter.log`. As a fallback you can install [openSUSE Tumbleweed](opensuse-tumbleweed.md) next
+to SLES and pick it in the app.
 
 ## Step 4: Check the setup
 
 Paste this into the root shell (`wsl -d SUSE-Linux-Enterprise-16.0 -u root`):
 
 ```sh
-for c in btrfs blkid modinfo fsapfsmount; do
+for c in btrfs blkid modinfo fsapfsmount zpool; do
   command -v $c >/dev/null && echo "OK       $c" || echo "missing  $c"
 done
 ```
 
-`btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` only matters for Mac drives.
+`btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` (Mac drives) and `zpool` (ZFS) only
+matter if you installed those options.
 
 ## Step 5: Use it with Btrfs USB Mounter
 
@@ -157,8 +211,9 @@ To test from the command line, open an administrator terminal in the program fol
 | `zypper` finds no packages, or "No repositories defined" | Register the system (Step 3), then `zypper refresh` |
 | `libfsapfs` not found | Turn on Package Hub with `SUSEConnect -p ...` (Step 3) |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfsprogs` |
-| Status says *Needs tools* (Mac or ZFS drives) | Mac: install `libfsapfs` from Package Hub (Step 3), then click **Refresh**. ZFS: use openSUSE Tumbleweed |
-| Status says *No driver* | That filesystem needs the extra drivers, which need openSUSE: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *Needs tools* (Mac or ZFS drives) | Mac: install `libfsapfs` from Package Hub (Step 3), then click **Refresh**. ZFS: install `zfs` from the *filesystems* repository (Step 3) |
+| Status says *No driver* | That filesystem needs the extra drivers: see [Extra drivers](#extra-drivers) |
+| `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister SUSE-Linux-Enterprise-16.0`.
