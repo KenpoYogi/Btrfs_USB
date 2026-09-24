@@ -1,6 +1,15 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -13,6 +22,31 @@ namespace BtrfsUsbMounter.Core
     public static class Wsl
     {
         private static readonly char[] QuoteTriggers = { ' ', '\t', '\n', '\v', '"' };
+        private static int callSeq;
+
+        /// <summary>Debug log of how a call ended; more output is kept when it failed.</summary>
+        private static void LogEnd(int id, string what, Stopwatch sw, string output, string error, bool failed)
+        {
+            int lines = failed ? 60 : 12, chars = failed ? 6000 : 1500;
+            string outText = Log.Excerpt(output, lines, chars);
+            string errText = Log.Excerpt(error, lines, chars);
+            Log.Debug(string.Format(CultureInfo.InvariantCulture, "wsl#{0} {1} after {2:N0} ms{3}{4}", id, what, sw.ElapsedMilliseconds,
+                outText.Length > 0 ? Environment.NewLine + "  stdout:" + outText : string.Empty,
+                errText.Length > 0 ? Environment.NewLine + "  stderr:" + errText : string.Empty));
+        }
+
+        private static void StartProcess(Process p, int id)
+        {
+            try
+            {
+                p.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.DebugException(string.Format(CultureInfo.InvariantCulture, "wsl#{0} could not start {1}", id, p.StartInfo.FileName), ex);
+                throw;
+            }
+        }
 
         /// <summary>Quotes one argument per the Windows (CommandLineToArgvW) rules that wsl.exe uses.</summary>
         public static string QuoteArgument(string arg)
@@ -94,11 +128,15 @@ namespace BtrfsUsbMounter.Core
         public static async Task<WslResult> RunAsync(IEnumerable<string> args, TimeSpan timeout, CancellationToken ct)
         {
             var argList = args.ToList();
+            int id = Interlocked.Increment(ref callSeq);
             using (var p = new Process { StartInfo = CreateStartInfo(argList), EnableRaisingEvents = true })
             {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "wsl#{0} run (timeout {1:N0} s): wsl.exe {2}",
+                    id, timeout.TotalSeconds, p.StartInfo.Arguments));
+                Stopwatch sw = Stopwatch.StartNew();
                 var exited = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 p.Exited += (s, e) => exited.TrySetResult(true);
-                p.Start();
+                StartProcess(p, id);
                 Task<string> outTask = p.StandardOutput.ReadToEndAsync();
                 Task<string> errTask = p.StandardError.ReadToEndAsync();
 
@@ -110,6 +148,8 @@ namespace BtrfsUsbMounter.Core
                     if (first != exited.Task && !p.HasExited)
                     {
                         TryKill(p);
+                        Log.Debug(string.Format(CultureInfo.InvariantCulture, "wsl#{0} {1} after {2:N0} ms; process killed",
+                            id, ct.IsCancellationRequested ? "cancelled" : "TIMED OUT", sw.ElapsedMilliseconds));
                         if (ct.IsCancellationRequested) throw new OperationCanceledException(ct);
                         throw new TimeoutException(string.Format(
                             "wsl.exe timed out after {0:N0} s: {1}", timeout.TotalSeconds, JoinArguments(argList)));
@@ -120,7 +160,9 @@ namespace BtrfsUsbMounter.Core
                 p.WaitForExit();
                 string output = await outTask.ConfigureAwait(false);
                 string error = await errTask.ConfigureAwait(false);
-                return new WslResult { ExitCode = p.ExitCode, Output = Clean(output), Error = Clean(error) };
+                var result = new WslResult { ExitCode = p.ExitCode, Output = Clean(output), Error = Clean(error) };
+                LogEnd(id, "exit " + result.ExitCode.ToString(CultureInfo.InvariantCulture), sw, result.Output, result.Error, result.ExitCode != 0);
+                return result;
             }
         }
 
@@ -147,9 +189,13 @@ namespace BtrfsUsbMounter.Core
         public static async Task<StreamResult> RunStreamingAsync(IEnumerable<string> args, Action<string> onLine,
             TimeSpan timeout, CancellationToken ct)
         {
+            int id = Interlocked.Increment(ref callSeq);
             using (var p = new Process { StartInfo = CreateStartInfo(args) })
             {
-                p.Start();
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "wsl#{0} stream (timeout {1:N0} s): wsl.exe {2}",
+                    id, timeout.TotalSeconds, p.StartInfo.Arguments));
+                Stopwatch sw = Stopwatch.StartNew();
+                StartProcess(p, id);
                 Task<string> errTask = p.StandardError.ReadToEndAsync();
                 var lines = new List<string>();
                 DateTime deadline = DateTime.UtcNow + timeout;
@@ -193,6 +239,10 @@ namespace BtrfsUsbMounter.Core
                 p.WaitForExit(5000);
                 int code = p.HasExited ? p.ExitCode : -1;
                 string err = errTask.Wait(2000) ? Clean(errTask.Result) : string.Empty;
+                string how = cancelled ? "cancelled" : timedOut ? "TIMED OUT" : "exit " + code.ToString(CultureInfo.InvariantCulture);
+                // the lines themselves already went to onLine (usually the log), so only count them here
+                LogEnd(id, string.Format(CultureInfo.InvariantCulture, "{0}, {1} output lines", how, lines.Count),
+                    sw, string.Empty, err, code != 0 || cancelled || timedOut);
                 return new StreamResult
                 {
                     ExitCode = code, Lines = lines, Cancelled = cancelled, TimedOut = timedOut, Error = err
@@ -216,7 +266,11 @@ namespace BtrfsUsbMounter.Core
         {
             WslResult r = await Wsl.RunAsync(new[] { "--list", "--verbose" }, 60, ct).ConfigureAwait(false);
             var list = new List<Distro>();
-            if (r.ExitCode != 0) return list;
+            if (r.ExitCode != 0)
+            {
+                Log.Debug("Could not list WSL distributions (exit " + r.ExitCode.ToString(CultureInfo.InvariantCulture) + ").");
+                return list;
+            }
             foreach (string line in r.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 Match m = ListLine.Match(line);
@@ -228,11 +282,12 @@ namespace BtrfsUsbMounter.Core
                     State = m.Groups[3].Value,
                     Version = int.Parse(m.Groups[4].Value)
                 };
-                if (d.Version == 2 && !d.Name.StartsWith("docker-desktop", StringComparison.OrdinalIgnoreCase))
-                {
-                    list.Add(d);
-                }
+                bool usable = d.Version == 2 && !d.Name.StartsWith("docker-desktop", StringComparison.OrdinalIgnoreCase);
+                if (usable) list.Add(d);
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "Distro '{0}': WSL{1}, {2}{3}{4}", d.Name, d.Version, d.State,
+                    d.IsDefault ? ", default" : string.Empty, usable ? string.Empty : " (ignored: not usable for mounting)"));
             }
+            if (list.Count == 0) Log.Debug("No usable WSL2 distribution in the list output.");
             return list;
         }
 

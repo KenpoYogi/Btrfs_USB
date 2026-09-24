@@ -1,5 +1,14 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
@@ -43,6 +52,7 @@ namespace BtrfsUsbMounter.Core
             catch (Exception ex)
             {
                 Log.Warn("State file unreadable, starting fresh: " + ex.Message);
+                Log.DebugException("State file parse error", ex);
                 loaded = null;
             }
 
@@ -52,7 +62,27 @@ namespace BtrfsUsbMounter.Core
             loaded.Mounts = loaded.Mounts.Where(m => m != null && !string.IsNullOrEmpty(m.Key)).ToList();
             if (loaded.Settings.Distro == null) loaded.Settings.Distro = string.Empty;
             if (loaded.Settings.Options == null) loaded.Settings.Options = string.Empty;
+            Log.Debug(string.Format(CultureInfo.InvariantCulture, "State loaded: settings {0}; mounts {1}; keep-alive PID {2}",
+                Describe(loaded.Settings), Describe(loaded.Mounts), loaded.KeepAlivePid));
             return new StateStore(loaded);
+        }
+
+        private static string Describe(AppSettings s)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "[distro '{0}', auto-mount {1}, open Explorer {2}, all disks {3}, options '{4}', APFS write {5}]",
+                s.Distro, s.AutoMount, s.OpenExplorer, s.ShowAllDisks, s.Options, s.ApfsWrite);
+        }
+
+        private static string Describe(IEnumerable<MountEntry> mounts)
+        {
+            List<string> items = mounts.Select(m => string.Format(CultureInfo.InvariantCulture, "'{0}' disk {1} part {2} via {3}",
+                m.Name, m.DiskNumber, m.PartitionNumber, m.Distro)).ToList();
+            return items.Count == 0 ? "(none)" : "[" + string.Join("; ", items) + "]";
+        }
+
+        private void LogMountsLocked(string why)
+        {
+            Log.Debug("Mount list " + why + ": " + Describe(state.Mounts));
         }
 
         // ---- settings -------------------------------------------------------------------------
@@ -65,7 +95,10 @@ namespace BtrfsUsbMounter.Core
         {
             lock (gate)
             {
+                string before = Describe(state.Settings);
                 mutate(state.Settings);
+                string after = Describe(state.Settings);
+                if (after != before) Log.Debug("Settings changed: " + after);
                 SaveLocked();
             }
         }
@@ -96,6 +129,7 @@ namespace BtrfsUsbMounter.Core
             {
                 state.Mounts.RemoveAll(m => m.Key == entry.Key);
                 state.Mounts.Add(entry.Clone());
+                LogMountsLocked("after adding '" + entry.Name + "'");
                 SaveLocked();
             }
         }
@@ -104,7 +138,8 @@ namespace BtrfsUsbMounter.Core
         {
             lock (gate)
             {
-                state.Mounts.RemoveAll(match);
+                int removed = state.Mounts.RemoveAll(match);
+                if (removed > 0) LogMountsLocked("after removing " + removed.ToString(CultureInfo.InvariantCulture));
                 SaveLocked();
             }
         }
@@ -113,7 +148,9 @@ namespace BtrfsUsbMounter.Core
         {
             lock (gate)
             {
+                string before = Describe(state.Mounts);
                 state.Mounts = mounts.Select(m => m.Clone()).ToList();
+                if (Describe(state.Mounts) != before) LogMountsLocked("replaced");
                 SaveLocked();
             }
         }
@@ -131,6 +168,10 @@ namespace BtrfsUsbMounter.Core
             {
                 lock (gate)
                 {
+                    if (state.KeepAlivePid != value)
+                    {
+                        Log.Debug(string.Format(CultureInfo.InvariantCulture, "Keep-alive PID saved: {0} -> {1}", state.KeepAlivePid, value));
+                    }
                     state.KeepAlivePid = value;
                     SaveLocked();
                 }
@@ -164,6 +205,7 @@ namespace BtrfsUsbMounter.Core
             catch (Exception ex)
             {
                 Log.Warn("Could not save state: " + ex.Message);
+                Log.DebugException("State save error (" + AppPaths.StateFile + ")", ex);
             }
         }
     }

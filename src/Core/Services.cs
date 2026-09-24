@@ -1,3 +1,11 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -52,7 +60,11 @@ namespace BtrfsUsbMounter.Core
             if (toolsOk.ContainsKey(distro)) return true;
             WslResult r = await Wsl.RunRootAsync(distro,
                 "command -v btrfs >/dev/null 2>&1 && command -v blkid >/dev/null 2>&1", 60, ct).ConfigureAwait(false);
-            if (r.ExitCode != 0) return false;
+            if (r.ExitCode != 0)
+            {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "btrfs tools not found in {0} (btrfs or blkid missing, exit {1}).", distro, r.ExitCode));
+                return false;
+            }
             toolsOk[distro] = true;
             return true;
         }
@@ -139,6 +151,11 @@ namespace BtrfsUsbMounter.Core
         public async Task<CheckResult> OfflineCheckAsync(VolumeInfo volume, string distro, CancellationToken ct)
         {
             var result = new CheckResult { Label = volume.DisplayLabel };
+            if (volume.Kind != FsKind.Btrfs)
+            {
+                result.Summary = "The offline check (btrfs check) is only available for btrfs.";
+                return result;
+            }
             if (!await TestToolsAsync(distro, ct).ConfigureAwait(false))
             {
                 result.ToolsMissing = true;
@@ -184,7 +201,7 @@ namespace BtrfsUsbMounter.Core
                 if (c.Stopped)
                 {
                     try { await Wsl.RunRootAsync(distro, "pkill -f 'btrfs check' ; sleep 1", 30, CancellationToken.None).ConfigureAwait(false); }
-                    catch { }
+                    catch (Exception ex) { Log.DebugException("Stopping btrfs check inside WSL failed", ex); }
                 }
 
                 string safeLabel = Regex.Replace(volume.DisplayLabel, @"[^A-Za-z0-9._-]", "_");
@@ -213,7 +230,7 @@ namespace BtrfsUsbMounter.Core
             {
                 Log.Info(string.Format("Detaching disk {0}...", volume.DiskNumber));
                 try { await Wsl.RunAsync(new[] { "--unmount", diskPath }, 180, CancellationToken.None).ConfigureAwait(false); }
-                catch { }
+                catch (Exception ex) { Log.Exception("Detaching the disk after the check failed", ex); }
                 if (state.MountCount == 0) mounts.StopKeepAlive();
             }
             return result;
@@ -236,17 +253,24 @@ namespace BtrfsUsbMounter.Core
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+            Log.Debug("schtasks.exe " + arguments);
             using (Process p = Process.Start(psi))
             {
                 if (p == null)
                 {
                     output = string.Empty;
+                    Log.Debug("schtasks.exe did not start.");
                     return -1;
                 }
                 Task<string> err = p.StandardError.ReadToEndAsync();
                 output = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();
                 output = (output + " " + err.Result).Trim();
+                // /XML output is long and not interesting unless something failed
+                bool quietOutput = p.ExitCode == 0 && arguments.IndexOf("/XML", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                   arguments.IndexOf("/Query", StringComparison.OrdinalIgnoreCase) >= 0;
+                Log.Debug("schtasks.exe exit " + p.ExitCode.ToString(CultureInfo.InvariantCulture) +
+                          (quietOutput ? string.Empty : Log.Excerpt(output, 10, 1500)));
                 return p.ExitCode;
             }
         }
@@ -262,7 +286,11 @@ namespace BtrfsUsbMounter.Core
         {
             string xml;
             if (RunSchtasks("/Query /TN \"" + TaskName + "\" /XML", out xml) != 0) return false;
-            return xml.IndexOf(AppPaths.ExePath, StringComparison.OrdinalIgnoreCase) < 0;
+            bool elsewhere = xml.IndexOf(AppPaths.ExePath, StringComparison.OrdinalIgnoreCase) < 0;
+            Match command = Regex.Match(xml, "<Command>(.*?)</Command>", RegexOptions.Singleline);
+            Log.Debug("Logon task runs: " + (command.Success ? command.Groups[1].Value : "(no command found)") +
+                      (elsewhere ? "  (not this program: " + AppPaths.ExePath + ")" : "  (this program)"));
+            return elsewhere;
         }
 
         public static void Enable()
@@ -397,12 +425,18 @@ namespace BtrfsUsbMounter.Core
             {
                 if ((flags & JobFlags.Unique) != 0 && pending.Any(j => j.Name == name))
                 {
+                    if ((flags & JobFlags.Quiet) == 0) Log.Debug("Job '" + name + "' skipped: an identical job is already waiting.");
                     var skipped = new TaskCompletionSource<T>();
                     skipped.SetException(new JobSkippedException(name));
                     return skipped.Task;
                 }
                 job = new JobInfo(name, flags);
                 pending.Add(job);
+                if (!job.Quiet && (current != null || pending.Count > 1))
+                {
+                    Log.Debug(string.Format(CultureInfo.InvariantCulture, "Job '{0}' queued behind '{1}' ({2} waiting).",
+                        name, current != null ? current.Name : pending[0].Name, pending.Count - 1));
+                }
             }
             RaiseChanged();
             return RunCore(job, work);
@@ -410,6 +444,7 @@ namespace BtrfsUsbMounter.Core
 
         private async Task<T> RunCore<T>(JobInfo job, Func<CancellationToken, Task<T>> work)
         {
+            Stopwatch waited = Stopwatch.StartNew();
             await gate.WaitAsync().ConfigureAwait(false);
             lock (sync)
             {
@@ -417,10 +452,32 @@ namespace BtrfsUsbMounter.Core
                 current = job;
             }
             RaiseChanged();
+            // quiet jobs are the frequent background checks: only logged when slow or failing
+            if (!job.Quiet)
+            {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "Job '{0}' started ({1}{2}).", job.Name, job.Flags,
+                    waited.ElapsedMilliseconds > 100 ? string.Format(CultureInfo.InvariantCulture, ", waited {0:N0} ms", waited.ElapsedMilliseconds) : string.Empty));
+            }
+            Stopwatch ran = Stopwatch.StartNew();
             try
             {
                 job.Cts.Token.ThrowIfCancellationRequested();
-                return await Task.Run(() => work(job.Cts.Token), job.Cts.Token).ConfigureAwait(false);
+                T result = await Task.Run(() => work(job.Cts.Token), job.Cts.Token).ConfigureAwait(false);
+                if (!job.Quiet || ran.ElapsedMilliseconds > 5000)
+                {
+                    Log.Debug(string.Format(CultureInfo.InvariantCulture, "Job '{0}' finished in {1:N0} ms.", job.Name, ran.ElapsedMilliseconds));
+                }
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "Job '{0}' cancelled after {1:N0} ms.", job.Name, ran.ElapsedMilliseconds));
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.DebugException(string.Format(CultureInfo.InvariantCulture, "Job '{0}' failed after {1:N0} ms", job.Name, ran.ElapsedMilliseconds), ex);
+                throw;
             }
             finally
             {
@@ -437,6 +494,7 @@ namespace BtrfsUsbMounter.Core
             {
                 if (current != null)
                 {
+                    Log.Debug("Cancel requested for job '" + current.Name + "'.");
                     try { current.Cts.Cancel(); } catch (ObjectDisposedException) { }
                 }
             }
@@ -446,6 +504,8 @@ namespace BtrfsUsbMounter.Core
         {
             lock (sync)
             {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "Cancelling all jobs (running: {0}, waiting: {1}).",
+                    current != null ? current.Name : "none", pending.Count));
                 foreach (JobInfo j in pending.Concat(current != null ? new[] { current } : new JobInfo[0]))
                 {
                     try { j.Cts.Cancel(); } catch (ObjectDisposedException) { }
@@ -471,13 +531,16 @@ namespace BtrfsUsbMounter.Core
         {
             State = state;
             Cache = new SuperblockCache();
-            Mounts = new MountManager(state, Cache);
+            Support = new FsSupport();
+            Mounts = new MountManager(state, Cache, Support);
             Scanner = new VolumeScanner(state, Mounts, Cache);
             Maintenance = new Maintenance(state, Mounts);
         }
 
         public StateStore State { get; private set; }
         public SuperblockCache Cache { get; private set; }
+        /// <summary>Which filesystems the WSL kernel / distro can mount, per distro.</summary>
+        public FsSupport Support { get; private set; }
         public MountManager Mounts { get; private set; }
         public VolumeScanner Scanner { get; private set; }
         public Maintenance Maintenance { get; private set; }

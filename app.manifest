@@ -2,7 +2,7 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="2.0.0.0" name="BtrfsUsbMounter.app" />
 
-  <!-- wsl --mount and raw disk reads need administrator rights -->
+  <!-- "wsl mount" and raw disk reads need administrator rights -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">

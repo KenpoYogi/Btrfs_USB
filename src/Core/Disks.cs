@@ -1,7 +1,16 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -47,55 +56,83 @@ namespace BtrfsUsbMounter.Core
             }
         }
 
-        /// <summary>Returns the superblock, or null if the partition is not btrfs. readFailed = I/O error.</summary>
-        public static Superblock TryReadSuperblock(int diskNumber, long partitionOffset, out bool readFailed)
+        /// <summary>
+        /// Reads the start of a partition (one read, <see cref="FsProbe.ReadLength"/> bytes, less for tiny
+        /// partitions) and identifies the filesystem; null if none is recognised. readFailed = I/O error.
+        /// </summary>
+        public static FsInfo TryProbe(int diskNumber, long partitionOffset, long partitionSize, out bool readFailed)
         {
+            int length = FsProbe.ReadLength;
+            if (partitionSize > 0 && partitionSize < length) length = (int)(partitionSize & ~4095L);
+            if (length < 4096)
+            {
+                readFailed = false;
+                return null;
+            }
             byte[] buffer;
             try
             {
-                buffer = Read(diskNumber, partitionOffset + Superblock.SuperblockOffset, 4096);
+                buffer = Read(diskNumber, partitionOffset, length);
             }
-            catch
+            catch (Exception ex)
             {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture,
+                    "Raw read of disk {0} at offset {1:N0} ({2:N0} bytes) failed: {3}: {4}{5}", diskNumber, partitionOffset, length,
+                    ex.GetType().Name, ex.Message, ex is Win32Exception ? " (Win32 error " + ((Win32Exception)ex).NativeErrorCode + ")" : string.Empty));
                 readFailed = true;
                 return null;
             }
             readFailed = false;
-            return Superblock.Parse(buffer);
+            return FsProbe.Probe(buffer);
         }
     }
 
     /// <summary>
     /// Caches superblock reads per partition, so rescans don't wake a drive that has spun down.
-    /// A cached null means "checked, not btrfs". Read errors are never cached.
+    /// A cached null means "checked, no supported filesystem". Read errors are never cached.
     /// </summary>
     public sealed class SuperblockCache
     {
         private sealed class Entry
         {
-            public Superblock Value;
+            public FsInfo Value;
         }
 
         private readonly ConcurrentDictionary<string, Entry> entries = new ConcurrentDictionary<string, Entry>();
 
-        public Superblock GetOrRead(string volumeKey, int diskNumber, long offset)
+        public FsInfo GetOrRead(string volumeKey, int diskNumber, long offset, long size)
         {
             string key = volumeKey + "|" + offset;
             Entry entry;
-            if (entries.TryGetValue(key, out entry)) return entry.Value;
+            if (entries.TryGetValue(key, out entry))
+            {
+                Log.Debug(string.Format(CultureInfo.InvariantCulture, "  superblock disk {0} offset {1:N0}: cached, {2}",
+                    diskNumber, offset, Describe(entry.Value)));
+                return entry.Value;
+            }
             bool readFailed;
-            Superblock sb = RawDisk.TryReadSuperblock(diskNumber, offset, out readFailed);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            FsInfo sb = RawDisk.TryProbe(diskNumber, offset, size, out readFailed);
             if (!readFailed) entries[key] = new Entry { Value = sb };
+            Log.Debug(string.Format(CultureInfo.InvariantCulture, "  superblock disk {0} offset {1:N0}: read in {2:N0} ms, {3}",
+                diskNumber, offset, sw.ElapsedMilliseconds, readFailed ? "READ FAILED (not cached, retried next scan)" : Describe(sb)));
             return sb;
+        }
+
+        private static string Describe(FsInfo fs)
+        {
+            return fs == null ? "no supported filesystem signature" : fs.ToString();
         }
 
         public void Clear()
         {
+            Log.Debug("Superblock cache cleared (" + entries.Count.ToString(CultureInfo.InvariantCulture) + " entries).");
             entries.Clear();
         }
 
         public void InvalidateDisk(string diskKey)
         {
+            Log.Debug("Superblock cache: forgetting disk " + diskKey);
             string prefix = diskKey + "|";
             foreach (string k in entries.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
             {
@@ -112,6 +149,7 @@ namespace BtrfsUsbMounter.Core
                 string disk = bar >= 0 ? k.Substring(0, bar) : k;
                 if (!presentDiskKeys.Contains(disk))
                 {
+                    Log.Debug("Superblock cache: disk gone, dropping " + k);
                     Entry ignored;
                     entries.TryRemove(k, out ignored);
                 }
@@ -123,6 +161,37 @@ namespace BtrfsUsbMounter.Core
     public static class Storage
     {
         private const string Namespace = @"root\Microsoft\Windows\Storage";
+
+        /// <summary>MSFT_Disk BusType values, for the log.</summary>
+        public static string BusTypeName(int busType)
+        {
+            switch (busType)
+            {
+                case 1: return "SCSI";
+                case 2: return "ATAPI";
+                case 3: return "ATA";
+                case 4: return "1394";
+                case 5: return "SSA";
+                case 6: return "FibreChannel";
+                case 7: return "USB";
+                case 8: return "RAID";
+                case 9: return "iSCSI";
+                case 10: return "SAS";
+                case 11: return "SATA";
+                case 12: return "SD";
+                case 13: return "MMC";
+                case 14: return "Virtual";
+                case 15: return "FileBackedVirtual";
+                case 16: return "StorageSpaces";
+                case 17: return "NVMe";
+                default: return "Unknown(" + busType.ToString(CultureInfo.InvariantCulture) + ")";
+            }
+        }
+
+        public static string PartitionStyleName(int style)
+        {
+            return style == 1 ? "MBR" : style == 2 ? "GPT" : "RAW";
+        }
 
         public static List<DiskRecord> GetDisks()
         {

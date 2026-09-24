@@ -1,3 +1,11 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,6 +34,7 @@ namespace BtrfsUsbMounter
             }
             catch (ArgumentException ex)
             {
+                Log.Debug("Bad command line (" + Environment.CommandLine + "): " + ex.Message);
                 Cli.ShowMessage(ex.Message + Environment.NewLine + Environment.NewLine + CommandLineOptions.Usage, true);
                 return 2;
             }
@@ -34,6 +43,7 @@ namespace BtrfsUsbMounter
                 Cli.ShowMessage(CommandLineOptions.Usage, false);
                 return 0;
             }
+            Diagnostics.LogStartup(options.IsCli ? "command line" : options.Tray ? "tray" : "window", args);
             if (!File.Exists(AppPaths.WslExe))
             {
                 const string msg = "WSL is not installed. From an elevated prompt run \"wsl --install\", reboot, then start this program again.";
@@ -42,7 +52,9 @@ namespace BtrfsUsbMounter
                 else MessageBox.Show(msg, UiKit.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
-            return options.IsCli ? Cli.Run(options) : RunGui(options);
+            int code = options.IsCli ? Cli.Run(options) : RunGui(options);
+            Log.Debug("Exiting with code " + code.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
+            return code;
         }
 
         private static int RunGui(CommandLineOptions options)
@@ -50,9 +62,13 @@ namespace BtrfsUsbMounter
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-            Application.ThreadException += (s, e) => Log.Error("Unexpected error: " + e.Exception);
+            Application.ThreadException += (s, e) => Log.Exception("Unexpected error", e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Error("Fatal error: " + e.ExceptionObject);
-            TaskScheduler.UnobservedTaskException += (s, e) => e.SetObserved();
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                Log.DebugException("Unobserved background task exception", e.Exception);
+                e.SetObserved();
+            };
 
             using (var mutex = new Mutex(false, SingleInstance.MutexName))
             {
@@ -102,6 +118,7 @@ namespace BtrfsUsbMounter
             }
             catch (AbandonedMutexException)
             {
+                Log.Debug("Single instance: the previous copy ended without releasing the mutex (killed or crashed).");
                 return true;   // the previous owner was killed; we own it now
             }
         }
@@ -121,7 +138,12 @@ namespace BtrfsUsbMounter
 
         public static bool TryAcquire(Mutex mutex, bool trayStart)
         {
-            if (Wait(mutex, 0)) return true;
+            if (Wait(mutex, 0))
+            {
+                Log.Debug("Single instance: this is the only copy.");
+                return true;
+            }
+            Log.Debug("Single instance: another copy holds the mutex" + (trayStart ? "; tray start steps aside." : "; asking it to show its window."));
             if (trayStart)
             {
                 Log.Warn("Another copy is already running; the logon copy steps aside.");
@@ -131,7 +153,11 @@ namespace BtrfsUsbMounter
             using (var ack = new EventWaitHandle(false, EventResetMode.AutoReset, AckEventName))
             {
                 if (ShowMessage != 0) PostMessage(HwndBroadcast, ShowMessage, IntPtr.Zero, IntPtr.Zero);
-                if (ack.WaitOne(2000)) return false;   // the running copy brought its window up
+                if (ack.WaitOne(2000))
+                {
+                    Log.Debug("Single instance: the running copy showed its window; this copy exits.");
+                    return false;   // the running copy brought its window up
+                }
             }
 
             List<int> others = FindOtherInstances();
@@ -207,15 +233,21 @@ namespace BtrfsUsbMounter
     internal sealed class CommandLineOptions
     {
         public const string Usage =
-            "Btrfs USB Mounter - mount btrfs USB drives through WSL2\r\n\r\n" +
-            "Usage: BtrfsUsbMounter.exe [options]\r\n\r\n" +
+            "Btrfs USB Mounter - mount Linux and Mac USB drives through WSL2\r\n" +
+            AppInfo.Copyright + ". Licensed under the " + AppInfo.LicenseName + ".\r\n" +
+            AppInfo.LicenseSummary + "\r\n" +
+            AppInfo.NoWarranty + "\r\n" +
+            "Full terms: the LICENSE file next to the program, or " + AppInfo.LicenseUrl + "\r\n\r\n" +
+            "Usage: BtrfsUsbMounter [options]\r\n\r\n" +
             "  (no options)       open the window\r\n" +
             "  --tray             start hidden in the system tray\r\n" +
-            "  --list             list detected btrfs partitions\r\n" +
-            "  --mount-all        mount every detected, unmounted btrfs partition\r\n" +
+            "  --list             list detected filesystems (btrfs, ext2/3/4, XFS, JFS, ReiserFS,\r\n" +
+            "                     Reiser4, ZFS, HFS+, APFS) and whether they can be mounted\r\n" +
+            "  --mount-all        mount every detected, unmounted filesystem that can be mounted\r\n" +
             "  --unmount-all      flush and detach everything this program mounted\r\n" +
             "  --distro <name>    WSL2 distribution to use\r\n" +
-            "  --options <opts>   btrfs mount options, e.g. compress=zstd\r\n" +
+            "  --options <opts>   btrfs mount options, e.g. compress=zstd (btrfs drives only)\r\n" +
+            "  --verbose          also show troubleshooting detail (always written to the log file)\r\n" +
             "  --help             show this help\r\n";
 
         public bool Tray { get; private set; }
@@ -223,6 +255,7 @@ namespace BtrfsUsbMounter
         public bool MountAll { get; private set; }
         public bool UnmountAll { get; private set; }
         public bool ShowHelp { get; private set; }
+        public bool Verbose { get; private set; }
         public string Distro { get; private set; }
         public string Options { get; private set; }
 
@@ -241,6 +274,8 @@ namespace BtrfsUsbMounter
                     case "list": o.List = true; break;
                     case "mountall": o.MountAll = true; break;
                     case "unmountall": o.UnmountAll = true; break;
+                    case "verbose":
+                    case "v": o.Verbose = true; break;
                     case "help":
                     case "h":
                     case "?": o.ShowHelp = true; break;
@@ -314,7 +349,9 @@ namespace BtrfsUsbMounter
             Console.WriteLine();
             Log.Written += (line, level) =>
             {
-                ConsoleColor color = level == LogLevel.Warn ? ConsoleColor.Yellow
+                if (level == LogLevel.Debug && !options.Verbose) return;
+                ConsoleColor color = level == LogLevel.Debug ? ConsoleColor.DarkGray
+                                   : level == LogLevel.Warn ? ConsoleColor.Yellow
                                    : level == LogLevel.Error ? ConsoleColor.Red
                                    : level == LogLevel.Ok ? ConsoleColor.Green
                                    : ConsoleColor.Gray;
@@ -329,7 +366,7 @@ namespace BtrfsUsbMounter
             }
             catch (Exception ex)
             {
-                Log.Error(Fmt.Root(ex).Message);
+                Log.Exception("Command failed", ex);
                 return 1;
             }
             finally
@@ -343,6 +380,7 @@ namespace BtrfsUsbMounter
             var engine = new Engine(StateStore.Load());
             AppSettings settings = engine.State.Settings;
             CancellationToken ct = CancellationToken.None;
+            await Diagnostics.LogWslInfoAsync(ct).ConfigureAwait(false);
             List<Distro> distros = await DistroService.ListAsync(ct).ConfigureAwait(false);
             string distro = DistroService.Resolve(!string.IsNullOrEmpty(options.Distro) ? options.Distro : settings.Distro, distros);
             string mountOptions = options.Options ?? settings.Options;
@@ -352,20 +390,42 @@ namespace BtrfsUsbMounter
             List<VolumeInfo> volumes = scan.Volumes;
             int exitCode = 0;
 
+            if (distro != null)
+            {
+                try { await engine.Support.EnsureAsync(distro, ct).ConfigureAwait(false); }
+                catch (Exception ex) { Log.DebugException("Filesystem support check failed", ex); }
+            }
+
             if (options.List)
             {
                 if (volumes.Count == 0)
                 {
-                    Console.WriteLine("No btrfs partitions found on USB disks.");
+                    Console.WriteLine("No supported filesystems found on " + (settings.ShowAllDisks ? "the scanned disks." : "USB disks."));
                 }
                 else
                 {
-                    Console.WriteLine("{0,-10} {1,-5} {2,-6} {3,-18} {4,-28} {5}", "Status", "Disk", "Part", "Label", "Free", "Windows path");
+                    const string row = "{0,-13} {1,-9} {2,-5} {3,-6} {4,-18} {5,-28} {6}";
+                    Console.WriteLine(row, "Status", "Type", "Disk", "Part", "Label", "Free", "Windows path");
+                    var notes = new List<string>();
                     foreach (VolumeInfo v in volumes)
                     {
-                        string status = v.Disconnected ? "Unplugged" : v.Mounted ? "Mounted" : "Ready";
-                        Console.WriteLine("{0,-10} {1,-5} {2,-6} {3,-18} {4,-28} {5}", status, v.DiskNumber,
+                        FsAvailability a = engine.Support.Get(distro, v.Kind);
+                        string status = v.Disconnected ? "Unplugged"
+                                      : v.Mounted ? (v.Mount.ReadOnly ? "Mounted (ro)" : "Mounted")
+                                      : a == FsAvailability.NoDriver ? "No driver"
+                                      : a == FsAvailability.NeedsTools ? "Needs tools"
+                                      : a == FsAvailability.NotSupported ? "Not mountable"
+                                      : engine.Mounts.WillBeReadOnly(v, distro) ? "Ready (ro)" : "Ready";
+                        Console.WriteLine(row, status, v.KindName, v.DiskNumber,
                             v.PartitionNumber > 0 ? v.PartitionNumber.ToString() : "whole", v.DisplayLabel, Fmt.SpaceText(v), v.WindowsPath);
+                        string why = v.Mounted ? null : FsSupport.Explain(v.Kind, a);
+                        if (why != null) notes.Add(v.DisplayLabel + ": " + why);
+                        else if (!v.Mounted && !string.IsNullOrEmpty(v.FsNote)) notes.Add(v.DisplayLabel + ": " + v.FsNote);
+                    }
+                    if (notes.Count > 0)
+                    {
+                        Console.WriteLine();
+                        foreach (string n in notes.Distinct()) Console.WriteLine(n);
                     }
                 }
             }
@@ -379,7 +439,20 @@ namespace BtrfsUsbMounter
                 }
                 else
                 {
-                    List<VolumeInfo> targets = volumes.Where(v => !v.Mounted && !v.Disconnected).ToList();
+                    List<VolumeInfo> candidates = volumes.Where(v => !v.Mounted && !v.Disconnected).ToList();
+                    foreach (VolumeInfo v in candidates)
+                    {
+                        FsAvailability a = engine.Support.Get(distro, v.Kind);
+                        if (a != FsAvailability.Yes && a != FsAvailability.Unknown)
+                        {
+                            Log.Info(string.Format("Skipping {0} '{1}': {2}", v.KindName, v.DisplayLabel, FsSupport.Explain(v.Kind, a)));
+                        }
+                    }
+                    List<VolumeInfo> targets = candidates.Where(v =>
+                    {
+                        FsAvailability a = engine.Support.Get(distro, v.Kind);
+                        return a == FsAvailability.Yes || a == FsAvailability.Unknown;
+                    }).ToList();
                     if (targets.Count == 0) Log.Info("Nothing to mount.");
                     foreach (VolumeInfo v in targets)
                     {

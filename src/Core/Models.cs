@@ -1,3 +1,11 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -16,6 +24,8 @@ namespace BtrfsUsbMounter.Core
         [DataMember] public bool OpenExplorer { get; set; }
         [DataMember] public bool ShowAllDisks { get; set; }
         [DataMember] public string Options { get; set; }
+        /// <summary>Mount APFS read/write with the experimental linux-apfs-rw driver (default: read-only).</summary>
+        [DataMember] public bool ApfsWrite { get; set; }
 
         public AppSettings()
         {
@@ -35,6 +45,7 @@ namespace BtrfsUsbMounter.Core
             OpenExplorer = true;
             ShowAllDisks = false;
             Options = string.Empty;
+            ApfsWrite = false;
         }
 
         public AppSettings Clone()
@@ -57,6 +68,29 @@ namespace BtrfsUsbMounter.Core
         [DataMember] public string Distro { get; set; }
         [DataMember] public string Options { get; set; }
         [DataMember] public string MountedAt { get; set; }
+        /// <summary>Linux filesystem name (btrfs, ext4, xfs, apfs...). Missing in older files = btrfs.</summary>
+        [DataMember] public string FsType { get; set; }
+        [DataMember] public bool ReadOnly { get; set; }
+        /// <summary>"kernel", "fuse" or "zfs"; missing = kernel (see <see cref="Method"/>).</summary>
+        [DataMember] public string MountMethod { get; set; }
+
+        public FsKind Kind { get { return FsTypes.Parse(FsType); } }
+
+        public MountMethod Method
+        {
+            get
+            {
+                if (MountMethod == "fuse") return Core.MountMethod.ApfsFuse;
+                if (MountMethod == "zfs") return Core.MountMethod.ZfsPool;
+                if (MountMethod == "kernel") return Core.MountMethod.Kernel;
+                return FsTypes.Method(Kind);   // older entries
+            }
+        }
+
+        public static string MethodName(MountMethod m)
+        {
+            return m == Core.MountMethod.ApfsFuse ? "fuse" : m == Core.MountMethod.ZfsPool ? "zfs" : "kernel";
+        }
 
         public MountEntry Clone()
         {
@@ -169,9 +203,16 @@ namespace BtrfsUsbMounter.Core
         }
     }
 
-    /// <summary>One btrfs filesystem (partition or whole disk) as shown in the main list.</summary>
+    /// <summary>One filesystem (partition or whole disk) as shown in the main list.</summary>
     public sealed class VolumeInfo
     {
+        public FsKind Kind { get; set; }
+        /// <summary>Only read access is possible (APFS, journaled HFS+), or the mount is read-only.</summary>
+        public bool ReadOnly { get; set; }
+        /// <summary>Caveat from the superblock (see <see cref="FsInfo.Note"/>).</summary>
+        public string FsNote { get; set; }
+        public string KindName { get { return FsTypes.DisplayName(Kind); } }
+
         public string Key { get; set; }
         public int DiskNumber { get; set; }
         public string DiskUniqueId { get; set; }
@@ -187,6 +228,7 @@ namespace BtrfsUsbMounter.Core
         public string DriveLetters { get; set; }
         public double SpaceTotal { get; set; }
         public double SpaceUsed { get; set; }
+        /// <summary>Negative when unknown (the superblock does not record it and the drive is not mounted).</summary>
         public double SpaceFree { get; set; }
         public bool SpaceApprox { get; set; }
 

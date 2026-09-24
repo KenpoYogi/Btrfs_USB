@@ -1,3 +1,11 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Globalization;
 using System.IO;
@@ -6,6 +14,22 @@ using System.Text;
 
 namespace BtrfsUsbMounter.Core
 {
+    /// <summary>Copyright and license notices, shared by the window, the command line and the log.</summary>
+    public static class AppInfo
+    {
+        public const string Copyright = "Copyright (c) 2026 Jay W";
+        public const string LicenseName = "PolyForm Noncommercial License 1.0.0";
+        public const string LicenseUrl = "https://polyformproject.org/licenses/noncommercial/1.0.0/";
+        public const string LicenseSummary = "Free for noncommercial use only. Commercial use of any kind is not permitted.";
+        public const string NoWarranty = "Provided as is, without warranty or liability of any kind (see the license).";
+
+        /// <summary>Full license text shipped next to the program.</summary>
+        public static string LicenseFile
+        {
+            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LICENSE"); }
+        }
+    }
+
     /// <summary>Well-known file locations. Shared with the earlier PowerShell version, so settings carry over.</summary>
     public static class AppPaths
     {
@@ -58,28 +82,56 @@ namespace BtrfsUsbMounter.Core
         Info,
         Warn,
         Error,
-        Ok
+        Ok,
+        Debug     // troubleshooting detail: always in mounter.log, shown on screen only on request
     }
 
-    /// <summary>Thread-safe logger: appends to mounter.log (rotated at 5 MB) and raises <see cref="Written"/>.</summary>
+    /// <summary>
+    /// Thread-safe logger: appends to mounter.log (rotated at 10 MB, one .old copy kept) and raises
+    /// <see cref="Written"/>. File lines carry the date, milliseconds and thread id; screen lines are short.
+    /// </summary>
     public static class Log
     {
-        private const long MaxLogBytes = 5L * 1024 * 1024;
+        private const long MaxLogBytes = 10L * 1024 * 1024;
         private static readonly object Gate = new object();
         private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
 
-        /// <summary>Raised on the calling thread for every line. Subscribers must marshal to their own thread.</summary>
+        /// <summary>
+        /// Raised on the calling thread for every line, with the short screen form of the line.
+        /// Subscribers must marshal to their own thread and should skip <see cref="LogLevel.Debug"/>
+        /// unless the user asked for detail.
+        /// </summary>
         public static event Action<string, LogLevel> Written;
 
         public static void Info(string message)  { Write(message, LogLevel.Info); }
         public static void Warn(string message)  { Write(message, LogLevel.Warn); }
         public static void Error(string message) { Write(message, LogLevel.Error); }
         public static void Ok(string message)    { Write(message, LogLevel.Ok); }
+        public static void Debug(string message) { Write(message, LogLevel.Debug); }
+
+        /// <summary>Short message as an error, plus the full exception (type, stack, inner exceptions) as debug.</summary>
+        public static void Exception(string context, Exception ex)
+        {
+            Error(context + ": " + Fmt.Root(ex).Message);
+            Debug(context + " - exception details:" + Environment.NewLine + ex);
+        }
+
+        /// <summary>Full exception as debug only, for failures that are handled and expected now and then.</summary>
+        public static void DebugException(string context, Exception ex)
+        {
+            Debug(context + ": " + ex.GetType().Name + ": " + Fmt.Root(ex).Message + Environment.NewLine + ex);
+        }
 
         public static void Write(string message, LogLevel level)
         {
-            string line = string.Format(CultureInfo.InvariantCulture, "{0:HH:mm:ss}  {1,-5}  {2}",
-                DateTime.Now, level.ToString().ToUpperInvariant(), message);
+            message = message ?? string.Empty;
+            DateTime now = DateTime.Now;
+            string levelText = level.ToString().ToUpperInvariant();
+            string screen = string.Format(CultureInfo.InvariantCulture, "{0:HH:mm:ss}  {1,-5}  {2}", now, levelText, message);
+            string prefix = string.Format(CultureInfo.InvariantCulture, "{0:yyyy-MM-dd HH:mm:ss.fff} [{1,3}] {2,-5}  ",
+                now, System.Threading.Thread.CurrentThread.ManagedThreadId, levelText);
+            // continuation lines of multi-line messages are indented under the message text
+            string file = prefix + message.Replace("\r\n", "\n").Replace("\n", Environment.NewLine + new string(' ', prefix.Length));
             lock (Gate)
             {
                 try
@@ -91,7 +143,7 @@ namespace BtrfsUsbMounter.Core
                         if (File.Exists(old)) File.Delete(old);
                         File.Move(AppPaths.LogFile, old);
                     }
-                    File.AppendAllText(AppPaths.LogFile, line + Environment.NewLine, Utf8NoBom);
+                    File.AppendAllText(AppPaths.LogFile, file + Environment.NewLine, Utf8NoBom);
                 }
                 catch
                 {
@@ -101,8 +153,29 @@ namespace BtrfsUsbMounter.Core
             Action<string, LogLevel> handler = Written;
             if (handler != null)
             {
-                try { handler(line, level); } catch { }
+                try { handler(screen, level); } catch { }
             }
+        }
+
+        /// <summary>First lines / characters of command output, indented, for debug lines. Empty stays empty.</summary>
+        public static string Excerpt(string text, int maxLines, int maxChars)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            string[] lines = text.Replace("\r\n", "\n").Split('\n');
+            var sb = new StringBuilder();
+            int shown = 0;
+            foreach (string l in lines)
+            {
+                if (shown >= maxLines || sb.Length + l.Length > maxChars) break;
+                sb.Append(Environment.NewLine).Append("    ").Append(l);
+                shown++;
+            }
+            if (shown < lines.Length)
+            {
+                sb.Append(Environment.NewLine).Append(string.Format(CultureInfo.InvariantCulture,
+                    "    ... ({0} more lines, {1} characters in total)", lines.Length - shown, text.Length));
+            }
+            return sb.ToString();
         }
     }
 
@@ -132,6 +205,7 @@ namespace BtrfsUsbMounter.Core
         public static string SpaceText(VolumeInfo volume)
         {
             if (volume == null || volume.SpaceTotal <= 0) return string.Empty;
+            if (volume.SpaceFree < 0) return "size " + Bytes(volume.SpaceTotal);
             return string.Format(CultureInfo.CurrentCulture, "{0}{1} free of {2}",
                 volume.SpaceApprox ? "~" : string.Empty, BytesZero(volume.SpaceFree), Bytes(volume.SpaceTotal));
         }

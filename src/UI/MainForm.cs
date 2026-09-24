@@ -1,3 +1,11 @@
+// Btrfs USB Mounter
+// Copyright (c) 2026 Jay W
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+//
+// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
+// no commercial use of any kind is permitted. See the LICENSE file or
+// https://polyformproject.org/licenses/noncommercial/1.0.0/
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,7 +28,7 @@ namespace BtrfsUsbMounter.UI
         private const int DbtDevNodesChanged = 0x0007;
         private const int DbtDeviceArrival = 0x8000;
         private const int DbtDeviceRemoveComplete = 0x8004;
-        private const int SpaceColumn = 2;
+        private const int SpaceColumn = 3;
 
         private readonly Engine engine;
         private readonly JobQueue jobs;
@@ -39,6 +47,7 @@ namespace BtrfsUsbMounter.UI
         private bool trayHintShown;
         private bool suppressEvents;
         private bool ejectHintShown;
+        private volatile bool showDebugLog;   // read from background threads in OnLogWritten
         private int initRetries;
         private DateTime? changeAt;
         private DateTime? retryInitAt;
@@ -63,7 +72,8 @@ namespace BtrfsUsbMounter.UI
         private NotifyIcon tray;
         private ToolStripMenuItem trayUnmountAll;
         private ContextMenuStrip toolsMenu;
-        private ToolStripMenuItem miInfo, miScrub, miCancelScrub, miCheck, miInstall, miReports;
+        private ToolStripMenuItem miInfo, miScrub, miCancelScrub, miCheck, miInstall, miReports, miDebugLog, miOpenLog, miAbout;
+        private ToolStripMenuItem miBuildDrivers, miApfsWrite;
         private System.Windows.Forms.Timer housekeeping;
         private System.Windows.Forms.Timer logTimer;
 
@@ -102,6 +112,7 @@ namespace BtrfsUsbMounter.UI
             var lblOptions = new Label { Text = "Mount options:", AutoSize = true, Margin = new Padding(0, 7, 4, 0) };
             txtOptions = new TextBox { Width = 190, Text = settings.Options, Margin = new Padding(0, 3, 16, 0) };
             tips.SetToolTip(txtOptions, "Optional btrfs-specific options, comma separated, e.g. compress=zstd or subvol=@data. " +
+                                        "Used for btrfs drives only; other filesystems mount with their defaults. " +
                                         "Generic options such as noatime are rejected by wsl --mount.");
             chkAuto = UiKit.MakeCheckBox("Auto-mount on plug-in", settings.AutoMount);
             chkExplorer = UiKit.MakeCheckBox("Open Explorer after mount", settings.OpenExplorer);
@@ -123,8 +134,8 @@ namespace BtrfsUsbMounter.UI
                 OwnerDraw = true
             };
             float scale = CurrentAutoScaleDimensions.Width / 96f;
-            string[] columns = { "Status", "Label", "Space", "Disk", "Part", "UUID", "Windows path" };
-            int[] widths = { 95, 140, 250, 200, 45, 250, 290 };
+            string[] columns = { "Status", "Label", "Type", "Space", "Disk", "Part", "UUID", "Windows path" };
+            int[] widths = { 125, 140, 70, 250, 200, 45, 250, 290 };
             for (int i = 0; i < columns.Length; i++) list.Columns.Add(columns[i], (int)Math.Round(widths[i] * scale));
             list.DrawColumnHeader += (s, e) => e.DrawDefault = true;
             list.DrawItem += (s, e) => { };
@@ -197,9 +208,16 @@ namespace BtrfsUsbMounter.UI
             miCheck = new ToolStripMenuItem("Offline check (read-only)...");
             miInstall = new ToolStripMenuItem("Install btrfs tools");
             miReports = new ToolStripMenuItem("Open check reports folder");
+            miDebugLog = new ToolStripMenuItem("Show detailed log lines") { CheckOnClick = true };
+            miOpenLog = new ToolStripMenuItem("Open log file");
+            miAbout = new ToolStripMenuItem("About and license...");
+            miBuildDrivers = new ToolStripMenuItem("Build filesystem drivers (JFS, ReiserFS, HFS+, ZFS, APFS)...");
+            miApfsWrite = new ToolStripMenuItem("Allow APFS writes (experimental)") { Checked = settings.ApfsWrite };
             toolsMenu.Items.AddRange(new ToolStripItem[]
             {
-                miInfo, new ToolStripSeparator(), miScrub, miCancelScrub, miCheck, new ToolStripSeparator(), miInstall, miReports
+                miInfo, new ToolStripSeparator(), miScrub, miCancelScrub, miCheck, new ToolStripSeparator(), miInstall, miReports,
+                new ToolStripSeparator(), miBuildDrivers, miApfsWrite,
+                new ToolStripSeparator(), miDebugLog, miOpenLog, new ToolStripSeparator(), miAbout
             });
             list.ContextMenuStrip = toolsMenu;
 
@@ -248,6 +266,27 @@ namespace BtrfsUsbMounter.UI
             miCheck.Click += (s, e) => OfflineCheck(SelectedVolume);
             miInstall.Click += (s, e) => RequestInstallTools(null, true);
             miReports.Click += (s, e) => Process.Start(new ProcessStartInfo("explorer.exe", "\"" + AppPaths.EnsureChecksDir() + "\"") { UseShellExecute = true });
+            miDebugLog.CheckedChanged += (s, e) =>
+            {
+                showDebugLog = miDebugLog.Checked;
+                Log.Info(showDebugLog
+                    ? "Detailed log lines are now shown here (they are always written to the log file)."
+                    : "Detailed log lines hidden (still written to the log file).");
+            };
+            miAbout.Click += (s, e) => ShowAbout();
+            miBuildDrivers.Click += (s, e) => RequestBuildDrivers();
+            miApfsWrite.Click += (s, e) => ToggleApfsWrite();
+            miOpenLog.Click += (s, e) =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo("notepad.exe", "\"" + AppPaths.LogFile + "\"") { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    Log.Exception("Could not open the log file", ex);
+                }
+            };
 
             cmbDistro.SelectedIndexChanged += (s, e) =>
             {
@@ -255,6 +294,7 @@ namespace BtrfsUsbMounter.UI
                 string d = SelectedDistro;
                 engine.State.UpdateSettings(x => x.Distro = d ?? string.Empty);
                 UpdateButtonState();
+                RequestScan(false, false, null, 0, false);   // re-checks which filesystems this distro can mount
             };
             txtOptions.TextChanged += (s, e) =>
             {
@@ -328,7 +368,16 @@ namespace BtrfsUsbMounter.UI
             if (m.Msg == WmDeviceChange)
             {
                 long w = m.WParam.ToInt64();
-                if (w == DbtDevNodesChanged || w == DbtDeviceArrival || w == DbtDeviceRemoveComplete) OnDeviceChanged();
+                if (w == DbtDevNodesChanged || w == DbtDeviceArrival || w == DbtDeviceRemoveComplete)
+                {
+                    // events come in bursts; log the first one of each burst
+                    if (!changeAt.HasValue)
+                    {
+                        Log.Debug("WM_DEVICECHANGE " + (w == DbtDeviceArrival ? "DBT_DEVICEARRIVAL" : w == DbtDeviceRemoveComplete
+                            ? "DBT_DEVICEREMOVECOMPLETE" : "DBT_DEVNODES_CHANGED") + "; checking disks after 1.5 s of quiet.");
+                    }
+                    OnDeviceChanged();
+                }
             }
             else if (m.Msg == SingleInstance.ShowMessage && SingleInstance.ShowMessage != 0)
             {
@@ -336,6 +385,88 @@ namespace BtrfsUsbMounter.UI
                 SingleInstance.Acknowledge();
             }
             base.WndProc(ref m);
+        }
+
+        private void ToggleApfsWrite()
+        {
+            bool enable = !engine.State.Settings.ApfsWrite;
+            if (enable)
+            {
+                DialogResult answer = UiKit.Show(this,
+                    "Mount APFS drives read/write?\r\n\r\n" +
+                    "Writing uses the linux-apfs-rw driver, whose write support is EXPERIMENTAL: it can corrupt the " +
+                    "drive. It needs that driver to be built (Tools > Build filesystem drivers), does not support " +
+                    "encrypted (FileVault) volumes, and mounts only the first volume of a container.\r\n\r\n" +
+                    "Only enable this for drives you have a backup of.",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+            }
+            engine.State.UpdateSettings(x => x.ApfsWrite = enable);
+            miApfsWrite.Checked = enable;
+            Log.Info(enable ? "APFS drives will be mounted read/write (experimental) when the APFS kernel driver is available."
+                            : "APFS drives will be mounted read-only.");
+            RenderVolumes();
+        }
+
+        /// <summary>Runs tools/build-wsl-modules.sh as root in the distro, streaming its progress into the log.</summary>
+        private async void RequestBuildDrivers()
+        {
+            string distro = SelectedDistro;
+            if (distro == null)
+            {
+                Log.Error("No WSL2 distribution selected.");
+                return;
+            }
+            string script = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "build-wsl-modules.sh");
+            if (!System.IO.File.Exists(script))
+            {
+                Log.Error("The driver build script is missing: " + script);
+                return;
+            }
+            DialogResult answer = UiKit.Show(this,
+                "Build the JFS, ReiserFS, HFS+, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
+                "This installs compilers in the distro (openSUSE: zypper), downloads the WSL kernel source (about 250 MB), " +
+                "OpenZFS and linux-apfs-rw, and compiles them. The first run takes 15-40 minutes; later runs are quicker. " +
+                "Other tasks wait until it finishes. Rerun it after every \"wsl --update\".\r\n\r\n" +
+                "The drivers are loaded into the WSL kernel to test them. Eject drives you are writing to first.",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes) return;
+
+            bool ok = await RunJob("Building filesystem drivers", async ct =>
+            {
+                string cmd = "sh \"$(wslpath -u '" + script.Replace("'", "'\\''") + "')\" 2>&1";
+                StreamResult r = await Wsl.RunStreamingToLogAsync(Wsl.RootArgs(distro, cmd), TimeSpan.FromHours(3), ct).ConfigureAwait(false);
+                return !r.Stopped && r.ExitCode == 0;
+            }, JobFlags.Cancellable);
+            if (ok) Log.Ok("Filesystem drivers built and installed for this WSL kernel.");
+            else Log.Error("Building the filesystem drivers did not finish; see the lines above.");
+            engine.Support.Forget(distro);
+            RequestScan(false, false, null, 0, false);
+        }
+
+        private void ShowAbout()
+        {
+            string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+            DialogResult answer = UiKit.Show(this,
+                string.Format("{0} {1}\r\n{2}\r\n\r\nLicensed under the {3}.\r\n{4}\r\n{5}\r\n\r\n{6}\r\n\r\nOpen the full license text?",
+                    UiKit.AppName, version, AppInfo.Copyright, AppInfo.LicenseName, AppInfo.LicenseSummary, AppInfo.NoWarranty, AppInfo.LicenseUrl),
+                MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (answer != DialogResult.Yes) return;
+            try
+            {
+                if (System.IO.File.Exists(AppInfo.LicenseFile))
+                {
+                    Process.Start(new ProcessStartInfo("notepad.exe", "\"" + AppInfo.LicenseFile + "\"") { UseShellExecute = true });
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo(AppInfo.LicenseUrl) { UseShellExecute = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Exception("Could not open the license", ex);
+            }
         }
 
         private void OnDeviceChanged()
@@ -353,6 +484,8 @@ namespace BtrfsUsbMounter.UI
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
             Log.Info(string.Format("{0} {1} started. WSL: {2}", UiKit.AppName, version, AppPaths.WslExe));
+            Log.Info("Troubleshooting detail goes to " + AppPaths.LogFile + " (Tools > Open log file).");
+            Log.Info(AppInfo.Copyright + ". " + AppInfo.LicenseName + ": " + AppInfo.LicenseSummary + " (Tools > About and license)");
             logTimer.Start();
             housekeeping.Start();
             nextPollAt = DateTime.Now.AddSeconds(30);
@@ -361,6 +494,8 @@ namespace BtrfsUsbMounter.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            Log.Debug(string.Format("Window closing requested ({0}; exit {1}, jobs idle {2}, mounted {3}).",
+                e.CloseReason, reallyExit, jobs.IsIdle, engine.State.MountCount));
             if (reallyExit || e.CloseReason == CloseReason.WindowsShutDown)
             {
                 Cleanup();
@@ -412,6 +547,7 @@ namespace BtrfsUsbMounter.UI
 
         private void Cleanup()
         {
+            Log.Debug("Closing the window: stopping timers and removing the tray icon.");
             housekeeping.Stop();
             logTimer.Stop();
             Log.Written -= OnLogWritten;
@@ -422,6 +558,7 @@ namespace BtrfsUsbMounter.UI
 
         private void ForceQuit()
         {
+            Log.Warn("Force quit: abandoning '" + (jobs.Current != null ? jobs.Current.Name : "?") + "'.");
             reallyExit = true;
             jobs.CancelAll();   // kills any wsl.exe the background task is waiting on
             try
@@ -456,6 +593,7 @@ namespace BtrfsUsbMounter.UI
             }
             catch (Exception ex)
             {
+                // the job queue already wrote the full exception to the log file
                 Log.Error(name + " failed: " + Fmt.Root(ex).Message);
             }
             return default(T);
@@ -473,6 +611,7 @@ namespace BtrfsUsbMounter.UI
 
         private void OnLogWritten(string line, LogLevel level)
         {
+            if (level == LogLevel.Debug && !showDebugLog) return;
             logQueue.Enqueue(line);
         }
 
@@ -542,9 +681,28 @@ namespace BtrfsUsbMounter.UI
             if (v.Mounted)
             {
                 ScrubStatus s = GetScrub(v);
-                return s != null && s.IsRunning ? string.Format(CultureInfo.CurrentCulture, "Scrub {0:N0}%", s.Percent) : "Mounted";
+                if (s != null && s.IsRunning) return string.Format(CultureInfo.CurrentCulture, "Scrub {0:N0}%", s.Percent);
+                return v.Mount.ReadOnly ? "Mounted (read-only)" : "Mounted";
             }
-            return "Ready";
+            switch (Availability(v))
+            {
+                case FsAvailability.NoDriver: return "No driver";
+                case FsAvailability.NeedsTools: return "Needs tools";
+                case FsAvailability.NotSupported: return "Not mountable";
+                default: return engine.Mounts.WillBeReadOnly(v, SelectedDistro) ? "Ready (read-only)" : "Ready";
+            }
+        }
+
+        private FsAvailability Availability(VolumeInfo v)
+        {
+            return v == null ? FsAvailability.Unknown : engine.Support.Get(SelectedDistro, v.Kind);
+        }
+
+        /// <summary>Mountable as far as we know (Unknown counts as yes: the mount itself will find out).</summary>
+        private bool CanMount(VolumeInfo v)
+        {
+            FsAvailability a = Availability(v);
+            return a == FsAvailability.Yes || a == FsAvailability.Unknown;
         }
 
         private void RenderVolumes()
@@ -557,12 +715,14 @@ namespace BtrfsUsbMounter.UI
             {
                 var item = new ListViewItem(RowStatus(v)) { Tag = v, UseItemStyleForSubItems = true };
                 item.SubItems.Add(v.DisplayLabel);
+                item.SubItems.Add(v.KindName);
                 item.SubItems.Add(Fmt.SpaceText(v));
                 item.SubItems.Add(string.Format("#{0}  {1}", v.DiskNumber, v.Model));
                 item.SubItems.Add(v.PartitionNumber > 0 ? v.PartitionNumber.ToString(CultureInfo.InvariantCulture) : "whole");
                 item.SubItems.Add(v.Uuid);
                 item.SubItems.Add(v.WindowsPath);
                 if (v.Disconnected) item.ForeColor = Color.Firebrick;
+                else if (!v.Mounted && !CanMount(v)) item.ForeColor = Color.Gray;
                 else if (v.Mounted)
                 {
                     item.ForeColor = Color.ForestGreen;
@@ -574,7 +734,8 @@ namespace BtrfsUsbMounter.UI
             if (list.Items.Count > 0 && list.SelectedItems.Count == 0) list.Items[0].Selected = true;
             list.EndUpdate();
             emptyLabel.Visible = list.Items.Count == 0;
-            emptyLabel.Text = "No btrfs partitions found.\r\n\r\nPlug in a btrfs-formatted USB hard drive - it will appear here automatically.";
+            emptyLabel.Text = "No supported filesystems found.\r\n\r\nPlug in a USB hard drive with btrfs, ext2/3/4, XFS, JFS, ReiserFS, " +
+                              "Reiser4, ZFS, HFS+ or APFS - it will appear here automatically.";
             UpdateButtonState();
         }
 
@@ -628,10 +789,12 @@ namespace BtrfsUsbMounter.UI
             using (var brush = new SolidBrush(bg)) g.FillRectangle(brush, b);
             const TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine;
 
-            if (v == null || v.SpaceTotal <= 0)
+            if (v == null || v.SpaceTotal <= 0 || v.SpaceFree < 0)
             {
+                // no size, or size without free space (recorded outside the superblock): text only, no bar
+                string text = v != null && v.SpaceTotal > 0 ? Fmt.SpaceText(v) + "  (free space shown once mounted)" : "n/a";
                 var na = new Rectangle(b.X + 6, b.Y, Math.Max(0, b.Width - 8), b.Height);
-                TextRenderer.DrawText(g, "n/a", list.Font, na, selected && focused ? fg : Color.Gray, flags);
+                TextRenderer.DrawText(g, text, list.Font, na, selected && focused ? fg : Color.Gray, flags);
                 return;
             }
 
@@ -657,7 +820,7 @@ namespace BtrfsUsbMounter.UI
             bool idle = !jobs.IsMutatingBusy;
             bool hasDistro = SelectedDistro != null;
             bool mounted = v != null && v.Mounted;
-            btnMount.Enabled = idle && hasDistro && v != null && !v.Mounted && !v.Disconnected;
+            btnMount.Enabled = idle && hasDistro && v != null && !v.Mounted && !v.Disconnected && CanMount(v);
             btnUnmount.Enabled = idle && mounted;
             btnOpen.Enabled = mounted && !v.Disconnected;
             btnShell.Enabled = mounted && !v.Disconnected;
@@ -684,11 +847,12 @@ namespace BtrfsUsbMounter.UI
             ScrubStatus sc = GetScrub(v);
             bool running = sc != null && sc.IsRunning;
             bool mountedOk = v != null && v.Mounted && !v.Disconnected;
-            miInfo.Enabled = v != null && !v.Disconnected;
+            bool btrfs = v != null && v.Kind == FsKind.Btrfs;
+            miInfo.Enabled = btrfs && !v.Disconnected;
             miScrub.Text = sc != null && sc.IsResumable ? "Resume scrub" : "Start scrub (verify all data)";
-            miScrub.Enabled = mountedOk && !running;
+            miScrub.Enabled = btrfs && mountedOk && !running;
             miCancelScrub.Enabled = running;
-            miCheck.Enabled = v != null && !v.Mounted && !v.Disconnected && !jobs.IsMutatingBusy;
+            miCheck.Enabled = btrfs && !v.Mounted && !v.Disconnected && !jobs.IsMutatingBusy;
             string d = SelectedDistro;
             miInstall.Text = d != null ? "Install btrfs tools in " + d : "Install btrfs tools";
             miInstall.Enabled = d != null;
@@ -727,6 +891,7 @@ namespace BtrfsUsbMounter.UI
         {
             InitResult r = await RunJob(isRetry ? "Looking for WSL distributions" : "Starting up", async ct =>
             {
+                if (!isRetry) await Diagnostics.LogWslInfoAsync(ct).ConfigureAwait(false);
                 List<Distro> distros = await DistroService.ListAsync(ct).ConfigureAwait(false);
                 if (!isRetry) await engine.Mounts.SyncMountStateAsync(ct).ConfigureAwait(false);
                 bool exists = StartupTask.Exists();
@@ -794,9 +959,17 @@ namespace BtrfsUsbMounter.UI
 
         private async void RequestScan(bool clearCache, bool sync, List<string> newDiskIds, int retry, bool autoMountAll)
         {
+            Log.Debug(string.Format("Scan requested (clear cache {0}, sync {1}, new disks {2}, retry {3}, auto-mount all {4}).",
+                clearCache, sync, newDiskIds != null ? newDiskIds.Count : 0, retry, autoMountAll));
             bool includeAll = engine.State.Settings.ShowAllDisks;
+            string supportDistro = SelectedDistro;
             ScanResult r = await RunJob("Scanning disks", async ct =>
             {
+                // Refresh re-checks the kernel too (a custom kernel or new tools may have been installed)
+                if (clearCache) engine.Support.Forget(supportDistro);
+                try { await engine.Support.EnsureAsync(supportDistro, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { Log.DebugException("Filesystem support check failed", ex); }
                 if (clearCache) engine.Cache.Clear();
                 if (sync) await engine.Mounts.SyncMountStateAsync(ct).ConfigureAwait(false);
                 return await engine.Scanner.ScanAsync(includeAll, ct).ConfigureAwait(false);
@@ -826,14 +999,20 @@ namespace BtrfsUsbMounter.UI
 
             if (newDiskIds != null && newDiskIds.Count > 0)
             {
-                List<VolumeInfo> fresh = volumes.Where(v => !v.Mounted && !v.Disconnected && newDiskIds.Contains(v.DiskUniqueId)).ToList();
+                List<VolumeInfo> detected = volumes.Where(v => !v.Mounted && !v.Disconnected && newDiskIds.Contains(v.DiskUniqueId)).ToList();
+                foreach (VolumeInfo v in detected.Where(x => !CanMount(x)))
+                {
+                    Log.Warn(string.Format("{0} '{1}' detected but cannot be mounted: {2}", v.KindName, v.DisplayLabel, FsSupport.Explain(v.Kind, Availability(v))));
+                }
+                List<VolumeInfo> fresh = detected.Where(CanMount).ToList();
                 if (fresh.Count > 0)
                 {
                     if (engine.State.Settings.AutoMount) RequestMount(fresh);
-                    else ShowBalloon("btrfs drive detected", string.Join(", ", fresh.Select(v => v.DisplayLabel)) + " is ready to mount.", ToolTipIcon.Info);
+                    else ShowBalloon("Drive detected", string.Join(", ", fresh.Select(v => v.DisplayLabel + " (" + v.KindName + ")")) + " is ready to mount.", ToolTipIcon.Info);
                 }
                 else if (retry < 2)
                 {
+                    Log.Debug("New disk has no btrfs volume yet; scanning again in 3 s (partitions may still be enumerating).");
                     // a freshly plugged disk can take a few seconds before its partitions enumerate
                     retryScanIds = newDiskIds;
                     retryScanCount = retry + 1;
@@ -846,7 +1025,7 @@ namespace BtrfsUsbMounter.UI
                 RequestScrubPoll();   // pick up a scrub that was running before this session
                 if (engine.State.Settings.AutoMount)
                 {
-                    List<VolumeInfo> targets = volumes.Where(v => !v.Mounted && !v.Disconnected).ToList();
+                    List<VolumeInfo> targets = volumes.Where(v => !v.Mounted && !v.Disconnected && CanMount(v)).ToList();
                     if (targets.Count > 0)
                     {
                         Log.Info("Auto-mount: mounting drives that were already plugged in.");
@@ -866,6 +1045,8 @@ namespace BtrfsUsbMounter.UI
             if (sig == lastDiskSig) return;
             List<string> added = ids.Where(x => !lastDiskIds.Contains(x)).ToList();
             List<string> removed = lastDiskIds.Where(x => !ids.Contains(x)).ToList();
+            Log.Debug(string.Format("Disk list changed. Added: {0}. Removed: {1}.",
+                added.Count == 0 ? "none" : string.Join(", ", added), removed.Count == 0 ? "none" : string.Join(", ", removed)));
             lastDiskSig = sig;
             lastDiskIds = ids;
 
@@ -902,6 +1083,8 @@ namespace BtrfsUsbMounter.UI
             targets = targets.Where(v => v != null).ToList();
             if (targets.Count == 0) return;
             AppSettings s = engine.State.Settings;
+            Log.Debug(string.Format("Mount requested for {0} via {1}, options '{2}'.",
+                string.Join(", ", targets.Select(v => "'" + v.DisplayLabel + "' (" + v.Key + ")")), distro, s.Options));
             SetRowText(targets.Select(v => v.Key), "Mounting...");
 
             List<Tuple<VolumeInfo, MountEntry>> results = await RunJob("Mounting", async ct =>
@@ -937,6 +1120,7 @@ namespace BtrfsUsbMounter.UI
         private async void RequestUnmount(VolumeInfo v)
         {
             if (v == null) return;
+            Log.Debug(string.Format("Eject requested for '{0}' ({1}, mounted as '{2}', disconnected {3}).", v.DisplayLabel, v.Key, v.MountName, v.Disconnected));
             SetRowText(new[] { v.Key }, "Ejecting...");
             bool ok = await RunJob("Ejecting", ct => engine.Mounts.DismountAsync(v, ct), JobFlags.Mutating | JobFlags.Cancellable);
             if (ok) ShowBalloon("Safe to eject", v.DisplayLabel + " was flushed and detached.", ToolTipIcon.Info);
@@ -994,6 +1178,7 @@ namespace BtrfsUsbMounter.UI
             VolumeInfo v = SelectedVolume;
             if (v == null) return;
             if (v.Mounted && !v.Disconnected) OpenInExplorer(v);
+            else if (!v.Mounted && !CanMount(v)) Log.Warn(string.Format("'{0}' ({1}): {2}", v.DisplayLabel, v.KindName, FsSupport.Explain(v.Kind, Availability(v))));
             else if (!v.Mounted && !jobs.IsMutatingBusy) RequestMount(new List<VolumeInfo> { v });
         }
 
@@ -1067,7 +1252,7 @@ namespace BtrfsUsbMounter.UI
 
         private async void RequestScrubPoll()
         {
-            List<VolumeInfo> targets = volumes.Where(v => v.Mounted && !v.Disconnected && !string.IsNullOrEmpty(v.MountName)).ToList();
+            List<VolumeInfo> targets = volumes.Where(v => v.Mounted && !v.Disconnected && !string.IsNullOrEmpty(v.MountName) && v.Kind == FsKind.Btrfs).ToList();
             if (targets.Count == 0) return;
             List<ScrubProgress> results = await RunJob("Checking scrub progress", async ct =>
             {
