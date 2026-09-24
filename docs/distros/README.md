@@ -6,20 +6,20 @@ Microsoft's WSL kernel, which is the same for every distro. The distro supplies 
 runs, like `btrfs`, `blkid` and `fsapfsmount`. That is why some features depend on the distro.
 
 **Not sure? Pick [openSUSE Tumbleweed](opensuse-tumbleweed.md).** It is the distro the app is
-developed and tested on, and the only one where every feature is tested. Leap and SLES have
-everything the extra drivers need too, including openSUSE's *filesystems* repository for the ZFS
-tools, but the driver build is untested there.
+developed on. The extra drivers from **Tools > Build filesystem drivers** are tested on Tumbleweed
+and on [Kali](kali.md). The build works with zypper (openSUSE, SLES) and apt (Debian, Kali, Ubuntu);
+on Leap, SLES, Debian and Ubuntu it is expected to work but not tested yet.
 
 | Distro | Guide | btrfs, ext, XFS | Mac (APFS) read-only | Extra drivers (JFS, HFS+, ZFS, APFS read/write) |
 |---|---|---|---|---|
 | openSUSE Tumbleweed | [opensuse-tumbleweed.md](opensuse-tumbleweed.md) | Yes (tested) | Yes | Yes |
 | openSUSE Leap 16.0 | [opensuse-leap.md](opensuse-leap.md) | Yes | Yes | Should work (not tested) |
 | SUSE Linux Enterprise Server | [sles.md](sles.md) | Yes (needs registration for most packages) | Yes, via Package Hub | Should work (not tested) |
-| Ubuntu 24.04 | [ubuntu.md](ubuntu.md) | Yes | Yes | No |
-| Ubuntu 26.04 (plain `Ubuntu`) | [ubuntu.md](ubuntu.md) | Yes | No (package lacks FUSE) | No |
+| Ubuntu 24.04 | [ubuntu.md](ubuntu.md) | Yes | Yes | Should work (not tested), except ZFS (package too old) |
+| Ubuntu 26.04 (plain `Ubuntu`) | [ubuntu.md](ubuntu.md) | Yes | With the built APFS driver (package lacks FUSE) | Should work (not tested) |
 | Fedora | [fedora.md](fedora.md) | Yes | No | No |
-| Kali Linux | [kali.md](kali.md) | Yes | No (package lacks FUSE) | No |
-| Debian 13 | [debian.md](debian.md) | Yes | Yes | No |
+| Kali Linux | [kali.md](kali.md) | Yes (tested) | With the built APFS driver (tested) | Yes (tested) |
+| Debian 13 | [debian.md](debian.md) | Yes | Yes | Should work (not tested) |
 | CentOS Stream / AlmaLinux | [centos.md](centos.md) | Yes (EPEL, except AlmaLinux 10) | No | No |
 | Arch Linux | [arch.md](arch.md) | Yes | No | No |
 
@@ -29,6 +29,8 @@ ReiserFS, and current WSL kernels are newer than that.
 ## What was checked
 
 - **openSUSE Tumbleweed**: tested with the app.
+- **Kali**: the driver build and the drivers are tested (disk-image tests for JFS, APFS, ZFS; HFS+
+  load only); the app itself was run on Tumbleweed.
 - **All other distros**: package names and availability were checked against each distro's official
   package repositories in September 2026, but the app itself was not run on them. If something in a
   guide doesn't match what you see, please report it together with `mounter.log`.
@@ -46,6 +48,7 @@ ReiserFS, and current WSL kernels are newer than that.
   supported).
 - **Only WSL 2 works.** WSL 1 has no real Linux kernel. `wsl -l -v` shows the version;
   `wsl --set-version <name> 2` converts a distro.
-- **After `wsl --update`** you get a new WSL kernel. On openSUSE or SLES, rerun **Tools > Build
-  filesystem drivers** afterwards; nothing else needs to change. Ordinary WSL or Windows restarts
-  don't matter: the built drivers are kept on the distro's disk and the app puts them back.
+- **After `wsl --update`** you get a new WSL kernel. Rerun **Tools > Build filesystem drivers**
+  afterwards, in every distro where you built them; nothing else needs to change. Ordinary WSL or
+  Windows restarts don't matter: the built drivers are kept on the distro's disk and the app puts
+  them back.

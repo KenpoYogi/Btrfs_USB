@@ -733,12 +733,12 @@ namespace BtrfsUsbMounter.Core
                     if (kind == FsKind.Zfs)
                     {
                         return "The ZFS driver is installed but the zpool tool is missing in the WSL distro: install the " +
-                               "package zfs (openSUSE filesystems repository) or zfsutils-linux (Debian, Ubuntu), then click Refresh.";
+                               "package zfs (openSUSE filesystems repository) or zfsutils-linux (Debian, Kali, Ubuntu), then click Refresh.";
                     }
                     return "Mounting APFS needs a driver: install the package libfsapfs (openSUSE; SLES from Package Hub) or " +
                            "libfsapfs-utils (Debian 13, Ubuntu 24.04; the Ubuntu 26.04 and Kali builds lack FUSE support) for " +
-                           "read-only access, or build the APFS kernel driver with Tools > Build filesystem drivers (openSUSE), " +
-                           "then click Refresh.";
+                           "read-only access, or build the APFS kernel driver with Tools > Build filesystem drivers (openSUSE, SLES, " +
+                           "Debian, Kali, Ubuntu), then click Refresh.";
                 default:
                     return null;
             }

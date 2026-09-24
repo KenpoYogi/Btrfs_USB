@@ -86,8 +86,10 @@ Whether a filesystem can be mounted depends on the WSL kernel, and is checked at
 | Reiser4 | yes | no | never in mainline Linux; its patches stop at Linux 5.16 |
 
 \* needs the drivers built for the running WSL kernel: **Tools > Build filesystem drivers**, or
-`sh tools/build-wsl-modules.sh` as root in the distro. The stock WSL kernel has none of these, and the
-distro's `*-kmp-default` packages are built for openSUSE's own kernel, which WSL never boots. The script:
+`sh tools/build-wsl-modules.sh` as root in the distro. It works in distros with zypper (openSUSE, SLES) or
+apt (Debian, Kali, Ubuntu); tested on openSUSE Tumbleweed and Kali. The stock WSL kernel has none of
+these drivers, and the distros' own driver packages (`*-kmp-default`, `zfs-dkms`, `apfs-dkms`) are built
+for the distro's kernel or need its headers, which WSL doesn't have. The script:
 
 1. downloads the WSL kernel source for `uname -r` from github.com/microsoft/WSL2-Linux-Kernel and
    configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS and (before

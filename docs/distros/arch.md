@@ -10,8 +10,9 @@ btrfs tools are in Arch's core repository, so btrfs, ext and XFS drives work fin
 | JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
 | ReiserFS, Reiser4 | No (detected only) |
 
-**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For Mac drives or the extra filesystems, install
-openSUSE Tumbleweed next to Arch and pick it in the app. Arch's `linux-apfs-rw-dkms` and the AUR's
+**Tools > Build filesystem drivers** needs a distro with zypper or apt (openSUSE, SLES, Debian,
+Kali, Ubuntu). For Mac drives or the extra filesystems, install openSUSE Tumbleweed or Kali next to Arch
+and pick it in the app. Arch's `linux-apfs-rw-dkms` and the AUR's
 `zfs-utils` don't help: DKMS builds for Arch's own kernel, which WSL never starts.
 
 WSL install name: **`archlinux`**
@@ -142,7 +143,7 @@ To test from the command line, open an administrator terminal in the program fol
 | `pacman` says "unable to lock database" | Another pacman is running. Wait, or if none is: `rm /var/lib/pacman/db.lck` |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac and ZFS drives need another distro: openSUSE Tumbleweed does both |
-| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need a zypper or apt distro: see the [Tumbleweed](opensuse-tumbleweed.md) or [Kali](kali.md) guide |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister archlinux`. Your USB drives are

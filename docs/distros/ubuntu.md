@@ -6,18 +6,27 @@ Ubuntu is the most common WSL distro and a good choice for btrfs, ext and XFS dr
 
 - **`Ubuntu-24.04`** if you want to open **Mac (APFS) drives**. Its `libfsapfs-utils` package works.
 - **`Ubuntu`** (currently 26.04) or **`Ubuntu-26.04`** otherwise. On 26.04 the `libfsapfs-utils`
-  package is built without FUSE support, so `fsapfsmount` cannot mount anything.
+  package is built without FUSE support, so `fsapfsmount` cannot mount anything. Online guides for
+  26.04 build `apfs-fuse` from source instead; Btrfs USB Mounter doesn't use `apfs-fuse` (yet). On
+  26.04 the APFS kernel driver from **Tools > Build filesystem drivers** reads Mac drives instead.
 
 | What you want to open | Ubuntu 24.04 | Ubuntu 26.04 |
 |---|---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write | Yes, read/write |
-| APFS (Mac drives), read-only | Yes, with `libfsapfs-utils` | No (package lacks FUSE) |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) | No |
+| APFS (Mac drives), read-only | Yes, with `libfsapfs-utils` | Only with the built APFS driver (package lacks FUSE) |
+| JFS, HFS+ (Mac), APFS read/write | Should work, not tested (see below) | Should work, not tested |
+| ZFS | No: Ubuntu's ZFS 2.2.2 is too old for the WSL kernel | Should work, not tested |
 | ReiserFS, Reiser4 | No (detected only) | No |
 
-**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). If you need JFS, HFS+, ZFS or APFS read/write,
-install openSUSE Tumbleweed next to Ubuntu and pick it in the app. Ubuntu's `zfsutils-linux` package
-alone is not enough: the WSL kernel has no ZFS driver.
+**Extra drivers.** **Tools > Build filesystem drivers** compiles JFS, HFS+, ZFS and APFS drivers for
+the WSL kernel with apt and Ubuntu's `gcc-13`. It is tested on Kali (Debian-based, same apt route),
+not yet on Ubuntu. For ZFS it builds the OpenZFS version of Ubuntu's `zfsutils-linux`: 2.4.1 on 26.04
+works with the current WSL kernel (6.18), but 2.2.2 on 24.04 only supports Linux up to 6.6, so on
+24.04 the build skips ZFS and builds the others. Ubuntu's own `zfs-dkms` and `apfs-dkms` packages
+don't help: DKMS compiles the driver against the headers of the running kernel, and Microsoft's WSL
+kernel has no headers package. If the build fails on Ubuntu, please report it with `mounter.log`;
+[Kali](kali.md) or [openSUSE Tumbleweed](opensuse-tumbleweed.md) next to Ubuntu are tested
+alternatives.
 
 This guide uses **`Ubuntu-24.04`**. For another version, replace the name everywhere.
 
@@ -132,10 +141,11 @@ To test from the command line, open an administrator terminal in the program fol
 |---|---|
 | The distro box is empty | Run `wsl -l -v`. The distro must show `VERSION 2`; run `wsl --set-version Ubuntu-24.04 2` |
 | `apt` says "Unable to locate package libfsapfs-utils" | Turn on *universe*: `add-apt-repository -y universe && apt update` |
-| Mac drive fails with "No sub system to mount APFS format" | You are on Ubuntu 26.04, whose package lacks FUSE. Use `Ubuntu-24.04` or openSUSE Tumbleweed |
+| Mac drive fails with "No sub system to mount APFS format" | You are on Ubuntu 26.04, whose package lacks FUSE: `apt remove -y libfsapfs-utils`, build the APFS driver (**Tools > Build filesystem drivers**) and click **Refresh** |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
-| Status says *Needs tools* (Mac or ZFS drives) | Mac: on 24.04 `apt install -y libfsapfs-utils`, then click **Refresh**; on 26.04 use `Ubuntu-24.04` or openSUSE Tumbleweed. ZFS: use openSUSE Tumbleweed |
-| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *Needs tools* (Mac or ZFS drives) | Mac: on 24.04 `apt install -y libfsapfs-utils`, then click **Refresh**; on 26.04 build the APFS driver. ZFS: **Tools > Build filesystem drivers** (26.04; on 24.04 use Kali or openSUSE Tumbleweed) |
+| Status says *No driver* | Run **Tools > Build filesystem drivers** in the app (again after a `wsl --update`) |
+| `apt install zfs-dkms` or `apfs-dkms` builds no driver, or a guide asks for `linux-headers-$(uname -r)` | Expected in WSL: there are no headers for the WSL kernel, so DKMS builds nothing and the headers package doesn't exist. `apt remove zfs-dkms apfs-dkms`, then use **Tools > Build filesystem drivers** |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister Ubuntu-24.04`. Your USB drives

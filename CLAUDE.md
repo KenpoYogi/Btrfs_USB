@@ -29,8 +29,9 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - Logs: `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log`; state: `state.json` in the same folder
 
 ## Environment (developer machine)
-- WSL2 distro: openSUSE-Tumbleweed (default, only distro), user `chippy`
-- btrfsprogs and util-linux installed in the distro
+- WSL2 distros: openSUSE-Tumbleweed (default), user `chippy`; btrfsprogs and util-linux installed.
+  kali-linux (2026-09-24, test distro for the apt build path; root only, no user created; remove with
+  `wsl --unregister kali-linux`). Both have the 6.18 drivers built (each distro keeps its own)
 - Test drive: 2 TB Seagate ST32000641AS in a USB enclosure, disk 2, GPT, btrfs partition 1,
   label `ExtDrive`, mounted at `/mnt/wsl/ExtDrive`, top folder owned by chippy
 
@@ -63,6 +64,13 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   Factory, temporary repo; 6.18: gcc-13 from Tumbleweed). JFS needs KBUILD_EXTRA_SYMBOLS from
   fs/nls (nls_ucs2_utils is a shipped module). OpenZFS needs KERNEL_CC and a "gcc" shim.
   linux-apfs-rw needs ./genver.sh first. The script checks CRCs against btrfs.ko.
+- Package managers: the script supports zypper (openSUSE, SLES) and apt (Debian, Kali, Ubuntu) via
+  pkg_install ZYPPER-NAMES -- APT-NAMES and zfs_version (rpm / dpkg-query zfsutils-linux, epoch and
+  Debian revision stripped). apt: --no-install-recommends, so zfsutils-linux does not pull zfs-dkms.
+  DKMS packages (zfs-dkms, apfs-dkms) never work in WSL: no headers, no /lib/modules/<rel>/build.
+  OpenZFS META Linux-Maximum is checked: a too-old distro zfs (Ubuntu 24.04: 2.2.2, max 6.6) skips ZFS
+  instead of failing the run. Kali: gcc-13 13.4.0 pins only the 3 asm-goto probes; apfsprogs names
+  its checker apfsck; Kali's fsapfsmount has no FUSE, so APFS there uses the built kernel driver
 - Leap 16.0 / SLES: gcc13 is in their own repos (SLES 15 SP7: Development Tools module); zfs, jfsutils,
   apfsprogs come from download.opensuse.org/repositories/filesystems/{16.0,15.7,SLE_15_SP6}. The
   script's devel:gcc Factory fallback is Tumbleweed-only. Driver build untested on Leap/SLES
@@ -89,6 +97,10 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   only (no mkfs.hfsplus in Tumbleweed); ZFS create/export, import by GUID -R /mnt/wsl, write, scrub,
   export. Restore after a simulated restart (extra deleted, modules unloaded): detected + loaded.
   NOT tested: the app itself (wsl --mount needs an elevated shell), real USB disks, a real wsl --shutdown
+- Verified on Kali 2026.2 (2026-09-24, same kernel): full apt build (script installed zfsutils-linux
+  2.4.4 without zfs-dkms), 3 probes pinned, CRCs match, all 6 modules load; the same loop-device
+  tests pass (fsapfsmount skipped); restore after a simulated restart with ALL built modules unloaded
+  (zfs included) works. Tumbleweed re-checked after the apt refactor (jfs-only rebuild)
 - Verified earlier on kernel 6.6.87.2 only (2026-09-23): all 7 modules load; JFS rw + fsck clean;
   APFS kernel ro by default, readwrite + fsck.apfs clean; ZFS pool on a loop device: import by GUID
   under /mnt/wsl, zfs get, export; real-pool ZFS detection matches blkid. HFS+/ReiserFS: load only

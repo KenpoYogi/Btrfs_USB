@@ -17,8 +17,9 @@ installs with one command and has `btrfs-progs` in its own repositories.
 Red Hat-family distros don't ship `btrfs-progs` themselves (AlmaLinux 10 is the exception). On the
 others it comes from **EPEL** (Extra Packages for Enterprise Linux, a Fedora project repository).
 
-**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For Mac drives or the extra filesystems, install
-openSUSE Tumbleweed as well and pick it in the app.
+**Tools > Build filesystem drivers** needs a distro with zypper or apt (openSUSE, SLES, Debian,
+Kali, Ubuntu). For Mac drives or the extra filesystems, install openSUSE Tumbleweed or Kali as well
+and pick it in the app.
 
 ---
 
@@ -197,7 +198,7 @@ To test from the command line, open an administrator terminal in the program fol
 | `No match for argument: btrfs-progs` | EPEL is not on (route A, or AlmaLinux 9): install `epel-release` as shown above |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat step A3 or B3, or click **Yes** when the app offers to install `btrfs-progs` (turn on EPEL first, except on AlmaLinux 10) |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac and ZFS drives need another distro: openSUSE Tumbleweed does both |
-| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *No driver* | That filesystem needs the extra drivers, which need a zypper or apt distro: see the [Tumbleweed](opensuse-tumbleweed.md) or [Kali](kali.md) guide |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister CentOS-Stream-10` (or your

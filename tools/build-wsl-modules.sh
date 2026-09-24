@@ -9,7 +9,8 @@
 #
 # Builds filesystem kernel modules for the RUNNING WSL2 kernel (Microsoft's kernel, not the
 # distro's kernel-default package, which WSL never boots) and installs them where modprobe finds
-# them. Run as root inside the WSL distro (openSUSE Tumbleweed; package names are zypper's):
+# them. Run as root inside the WSL distro: openSUSE or SLES (zypper), or Debian, Kali or Ubuntu (apt).
+# Tested on openSUSE Tumbleweed and Kali.
 #
 #   sh build-wsl-modules.sh [jfs] [reiserfs] [hfsplus] [zfs] [apfs]    (no arguments = all)
 #
@@ -58,10 +59,32 @@ pin_kconfig() {
 
 [ "$(id -u)" = 0 ] || { echo "Run as root (wsl -u root)."; exit 1; }
 case "$KVER" in *microsoft*WSL2*) ;; *) echo "Not a WSL2 kernel: $KVER"; exit 1 ;; esac
-command -v zypper >/dev/null 2>&1 || {
-    echo "This script needs openSUSE (zypper and rpm). Install openSUSE-Tumbleweed in WSL and build there:"
-    echo "  wsl --install -d openSUSE-Tumbleweed"
+if command -v zypper >/dev/null 2>&1; then PM=zypper
+elif command -v apt-get >/dev/null 2>&1 && command -v dpkg-query >/dev/null 2>&1; then PM=apt
+else
+    echo "This script needs zypper (openSUSE, SLES) or apt (Debian, Kali, Ubuntu). Install one of those"
+    echo "distros in WSL and build there, e.g.: wsl --install -d openSUSE-Tumbleweed"
     exit 1
+fi
+
+# pkg_install ZYPPER-NAMES -- APT-NAMES: installs the names for this distro's package manager
+pkg_install() {
+    z=""; a=""; side=z
+    for p in "$@"; do
+        if [ "$p" = -- ]; then side=a; elif [ $side = z ]; then z="$z $p"; else a="$a $p"; fi
+    done
+    case $PM in
+        zypper) zypper --non-interactive --quiet install --no-recommends $z >/dev/null ;;
+        apt)    DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends $a >/dev/null ;;
+    esac
+}
+# Version of the installed ZFS userspace tools (upstream part only, e.g. 2.4.4), empty if not installed
+zfs_version() {
+    case $PM in
+        zypper) rpm -q --qf '%{VERSION}' zfs 2>/dev/null || true ;;
+        apt)    dpkg-query -W -f='${Status} ${Version}\n' zfsutils-linux 2>/dev/null |
+                    sed -n 's/^install ok installed \([0-9]*:\)\{0,1\}\([^-~+]*\).*/\2/p' ;;
+    esac
 }
 
 log "Kernel $KVER, building: $WANT"
@@ -73,8 +96,17 @@ CC_BIN=gcc-${KGCC:-13}
 # host tools only (resolve_btfids/libbpf): newer glibc headers turn a const warning into -Werror
 HOSTFIX="-Wno-error=discarded-qualifiers"
 log "Installing build tools (the running kernel was built with GCC ${KGCC:-?}, using $CC_BIN)"
-zypper --non-interactive --quiet install --no-recommends make flex bison bc libelf-devel openssl-devel \
-    dwarves python3 perl rsync tar gzip xz curl git kmod >/dev/null
+[ $PM = apt ] && apt-get update -q >/dev/null
+pkg_install make flex bison bc libelf-devel openssl-devel dwarves python3 perl rsync tar gzip xz curl git kmod \
+         -- make flex bison bc libelf-dev libssl-dev dwarves python3 perl rsync tar gzip xz-utils curl git kmod \
+            ca-certificates libc6-dev
+if ! command -v "$CC_BIN" >/dev/null && [ $PM = apt ]; then
+    pkg_install -- "gcc-$KGCC" || {
+        echo "gcc-$KGCC is not in this distro's repositories, and the WSL kernel was built with it."
+        echo "Use a distro that has it (Debian 13+, Kali, Ubuntu 24.04+ have gcc-13) or openSUSE Tumbleweed."
+        exit 1
+    }
+fi
 if ! command -v "$CC_BIN" >/dev/null; then
     if ! zypper --non-interactive --quiet install --no-recommends "gcc$KGCC" >/dev/null 2>&1; then
         # the devel:gcc fallback below is built for Tumbleweed; Leap and SLES have gcc13 in their own
@@ -187,8 +219,18 @@ done
 
 # ---- OpenZFS ----------------------------------------------------------------------------------
 if want zfs; then
-    ZVER=$(rpm -q --qf '%{VERSION}' zfs 2>/dev/null || true)
-    [ -n "$ZVER" ] && [ "${ZVER#package}" = "$ZVER" ] || { zypper --non-interactive --quiet install zfs >/dev/null; ZVER=$(rpm -q --qf '%{VERSION}' zfs); }
+    # the module must match the userspace tools (zpool), so build the version the distro ships.
+    # Debian and Kali: zfsutils-linux is in "contrib"; without recommends so zfs-dkms is not pulled in
+    ZVER=$(zfs_version)
+    case "$ZVER" in [0-9]*) ;; *)
+        pkg_install zfs -- zfsutils-linux || {
+            echo "Installing the ZFS tools failed. openSUSE/SLES: add the filesystems repository;"
+            echo "Debian/Kali: enable the contrib component in /etc/apt/sources.list."
+            exit 1
+        }
+        ZVER=$(zfs_version) ;;
+    esac
+    case "$ZVER" in [0-9]*) ;; *) echo "Cannot tell which ZFS version is installed"; exit 1 ;; esac
     cd "$WORK"
     if [ ! -d "zfs-$ZVER" ]; then
         log "Downloading OpenZFS $ZVER"
@@ -197,6 +239,15 @@ if want zfs; then
         rm -f "zfs-$ZVER.tar.gz"
     fi
     cd "zfs-$ZVER"
+    # an older distro package can be too old for the WSL kernel (Ubuntu 24.04: 2.2.2, Linux 6.6 at most)
+    zmax=$(sed -n 's/^Linux-Maximum:[[:space:]]*//p' META)
+    kmm=$(echo "$BASE" | cut -d. -f1,2)
+    newest=$(printf '%s\n%s\n' "$kmm" "${zmax:-$kmm}" | sort -t. -k1,1n -k2,2n | tail -1)
+    if [ "$newest" != "${zmax:-$kmm}" ]; then
+        log "Skipping zfs: OpenZFS $ZVER supports Linux up to $zmax, the WSL kernel is $kmm"
+        echo "Install a newer ZFS package if the distro has one and build again,"
+        echo "or build in openSUSE Tumbleweed or Kali."
+    else
     log "Building OpenZFS $ZVER kernel modules"
     make -s distclean >/dev/null 2>&1 || true
     # OpenZFS runs kbuild itself; give it the kernel's compiler (KERNEL_CC) and a "gcc" that is that
@@ -209,6 +260,7 @@ if want zfs; then
         CC="$CC_BIN" KERNEL_CC="$CC_BIN"
     PATH="$SHIM:$PATH" make -s -j"$JOBS"
     find module -name '*.ko' -exec cp {} "$STORE"/ \;
+    fi
 fi
 
 # ---- APFS (linux-apfs-rw) ---------------------------------------------------------------------

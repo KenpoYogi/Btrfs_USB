@@ -1,20 +1,25 @@
 # Btrfs USB Mounter with Kali Linux
 
-Kali is a Debian-based distro for security testing. The WSL image is minimal, but it installs the
-btrfs tools without any trouble.
+Kali is a Debian-based distro for security testing. The WSL image is minimal, but it installs
+everything Btrfs USB Mounter needs. With **Tools > Build filesystem drivers** it opens as many
+filesystems as openSUSE Tumbleweed. Kali is tested with the app, together with Tumbleweed.
 
 | What you want to open | Works on Kali? |
 |---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write |
-| APFS (Mac drives), read-only | No: Kali's `libfsapfs-utils` is built without FUSE support |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
+| APFS (Mac drives) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow APFS writes** (experimental) |
+| JFS, HFS+ (Mac), ZFS | Yes, after **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-zfs-apfs)) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 **Don't install `libfsapfs-utils` on Kali.** Its `fsapfsmount` exists but only prints *"No sub system
-to mount APFS format"*, and because the command is there the app would show Mac drives as ready.
+to mount APFS format"* (the Kali build has no FUSE support), and because the command is there the app
+would try it instead of the APFS driver. Mac drives work with the built APFS driver instead. Online
+guides that build `apfs-fuse` from source don't help either: Btrfs USB Mounter doesn't use it.
 
-**Tools > Build filesystem drivers** needs an openSUSE or SLES distro (it uses zypper). For Mac drives or the extra filesystems, install
-openSUSE Tumbleweed next to Kali and pick it in the app.
+**Kali's `zfs-dkms` and `apfs-dkms` packages don't work in WSL.** DKMS compiles a driver against the
+headers of the running kernel, and Microsoft's WSL kernel has no headers package, so they build
+nothing WSL can load. **Tools > Build filesystem drivers** builds the same drivers against the WSL
+kernel's own source instead. Kali's `zfsutils-linux` (the `zpool` tool) is used; the build installs it.
 
 WSL install name: **`kali-linux`**
 
@@ -95,6 +100,25 @@ apt install -y btrfs-progs util-linux kmod
 
 Kali's usual security tools (`kali-linux-default`) are not needed for Btrfs USB Mounter.
 
+### Optional: extra drivers (JFS, HFS+, ZFS, APFS)
+
+The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them for you
+with Kali's own compiler (`gcc-13`) and the WSL kernel's source code:
+
+1. In Btrfs USB Mounter pick **kali-linux** in the **WSL2 distro** box, then choose **Tools > Build
+   filesystem drivers**.
+2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in Kali. It installs the
+   build tools and `zfsutils-linux` with apt, and downloads the WSL kernel source (about 250 MB),
+   OpenZFS and linux-apfs-rw.
+3. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
+
+The ZFS tools come from Kali's *contrib* section, which the Kali WSL image turns on by default. The
+drivers survive WSL and Windows restarts: they are kept on Kali's disk and the app puts them back
+when needed. **Run the build again after every `wsl --update`**: a new WSL kernel needs its own build.
+
+Optional check tools for these filesystems: `apt install -y jfsutils apfsprogs` (`fsck.jfs`,
+`apfsck`).
+
 Type `exit` to leave the root shell. Tip: to hide Kali's welcome message in your own user's shell,
 run `touch ~/.hushlogin` there.
 
@@ -103,12 +127,12 @@ run `touch ~/.hushlogin` there.
 Paste this into the root shell (`wsl -d kali-linux -u root`):
 
 ```sh
-for c in btrfs blkid modinfo; do
+for c in btrfs blkid modinfo zpool; do
   command -v $c >/dev/null && echo "OK       $c" || echo "missing  $c"
 done
 ```
 
-All three must say **OK**.
+`btrfs`, `blkid` and `modinfo` must say **OK**. `zpool` appears after the driver build (ZFS only).
 
 ## Step 5: Use it with Btrfs USB Mounter
 
@@ -129,14 +153,34 @@ To test from the command line, open an administrator terminal in the program fol
 | Problem | Fix |
 |---|---|
 | The distro box is empty | Run `wsl -l -v`. The distro must show `VERSION 2`; run `wsl --set-version kali-linux 2` |
-| Mac drive shows *Ready* but fails with "No sub system to mount APFS format" | Remove the broken package: `apt remove -y libfsapfs-utils`, then use openSUSE Tumbleweed for Mac drives |
+| Mac drive fails with "No sub system to mount APFS format" | Remove the broken package: `apt remove -y libfsapfs-utils`, then click **Refresh**. The app then uses the built APFS driver |
 | `apt update` fails with a signature (key) error | Kali's archive key changed: follow the key update steps on [kali.org](https://www.kali.org/docs/), then retry |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
-| Status says *Needs tools* (Mac or ZFS drives) | Mac and ZFS drives need another distro: openSUSE Tumbleweed does both |
-| Status says *No driver* | That filesystem needs the extra drivers, which need an openSUSE or SLES distro: see the [Tumbleweed guide](opensuse-tumbleweed.md) |
+| Status says *Needs tools* (Mac or ZFS drives) | Run **Tools > Build filesystem drivers** (it builds the APFS driver and installs `zfsutils-linux`), then click **Refresh** |
+| Status says *No driver* | Run **Tools > Build filesystem drivers** (again after a `wsl --update`) |
+| `apt install zfs-dkms` or `apfs-dkms` builds no driver, or a guide asks for `linux-headers-$(uname -r)` | Expected in WSL: there are no headers for the WSL kernel, so DKMS builds nothing and the headers package doesn't exist. `apt remove zfs-dkms apfs-dkms`, then use **Tools > Build filesystem drivers** |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
-To remove the distro **and every file inside it**: `wsl --unregister kali-linux`. Your USB drives are
-not touched, but eject them first.
+## Removing Kali
+
+This deletes Kali **and every file inside it**, including the built drivers and the kernel source
+(about 5 GB). Your USB drives and other WSL distros are not touched.
+
+1. In Btrfs USB Mounter, **Eject** every drive that is mounted with Kali, then pick another distro in
+   the **WSL2 distro** box (or close the app).
+2. In a terminal (no administrator rights needed):
+
+   ```powershell
+   wsl --unregister kali-linux
+   wsl -l -v
+   ```
+
+   `kali-linux` is no longer in the list.
+3. If Kali was your default distro, pick a new one, for example
+   `wsl --set-default openSUSE-Tumbleweed`. The `*` in `wsl -l -v` marks the default.
+4. Only if you installed Kali from the Microsoft Store app (not with `wsl --install`): also remove
+   **Kali Linux** under **Settings > Apps > Installed apps**.
+
+To start over, install it again with `wsl --install -d kali-linux`.
 
 Other distros: [overview](README.md).
