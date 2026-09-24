@@ -188,19 +188,20 @@ When reporting a problem, attach `mounter.log` (and `mounter.log.old` if the pro
 
 ## License
 
-Copyright (c) 2026 Jay W. Licensed under the
-[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
-(SPDX: `PolyForm-Noncommercial-1.0.0`); the full text is in [LICENSE](LICENSE).
+Copyright (c) 2026 Jay Weiner. Licensed under the [MIT License](https://opensource.org/license/mit)
+with the [Commons Clause License Condition v1.0](https://commonsclause.com/)
+(SPDX: `LicenseRef-MIT-Commons-Clause`); the full text is in [LICENSE](LICENSE).
 
-- **Noncommercial use only.** Commercial use of any kind is not permitted.
-- Personal, hobby, research, educational and non-profit or public-sector use is allowed, as the
-  license defines it, and so are changes for those purposes.
-- Anyone who passes on a copy must include the license terms (or their URL) and the
-  `Required Notice:` line at the top of LICENSE. The build copies LICENSE next to the program for that.
+- You may use, copy, modify, merge and distribute the software, for any purpose.
+- **You may not sell it:** no charging for the software itself, or for a product or service
+  (including hosting or consulting/support services) whose value derives entirely or
+  substantially from its functionality.
+- Anyone who passes on a copy must keep the copyright notice, the MIT permission notice and the
+  Commons Clause notice. The build copies LICENSE next to the program for that.
 - Provided as is, without warranty or liability.
 
-This is a source-available license, not an open-source one: open-source licenses may not restrict
-commercial use.
+This is a source-available license, not an open-source one: the Commons Clause restricts selling,
+which open-source licenses may not do.
 
 ## Troubleshooting
 

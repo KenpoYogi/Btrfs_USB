@@ -22,8 +22,8 @@
     <Version>2.0.0</Version>
     <Product>Btrfs USB Mounter</Product>
     <Description>Mount Linux and Mac formatted USB drives on Windows through WSL2</Description>
-    <Company>Jay W</Company>
-    <Copyright>Copyright (c) 2026 Jay W. PolyForm Noncommercial License 1.0.0: noncommercial use only.</Copyright>
+    <Company>Jay Weiner</Company>
+    <Copyright>Copyright (c) 2026 Jay Weiner. MIT License with the Commons Clause: selling is not permitted.</Copyright>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -45,7 +45,7 @@
 
   <ItemGroup>
     <None Include="assets\app.ico" />
-    <!-- the license travels with every copy of the program (PolyForm Notices section) -->
+    <!-- the license travels with every copy of the program (MIT notice condition, Commons Clause included) -->
     <None Include="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <!-- run inside WSL by Tools > Build filesystem drivers -->
     <None Include="tools\build-wsl-modules.sh" CopyToOutputDirectory="PreserveNewest" />

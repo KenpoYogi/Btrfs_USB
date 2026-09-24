@@ -9,8 +9,9 @@ WinBtrfs driver is blocked by the Windows "Cross Certificates for Code Integrity
 policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 
 ## License
-- PolyForm Noncommercial 1.0.0 (noncommercial use only), Copyright (c) 2026 Jay W. NOT GPL: GPL
-  cannot forbid commercial use. Every .cs file starts with the SPDX header; notices come from
+- MIT + Commons Clause v1.0 (no selling), Copyright (c) 2026 Jay Weiner, SPDX
+  `LicenseRef-MIT-Commons-Clause`. NOT GPL: GPL cannot forbid selling. Every .cs file (and
+  tools/build-wsl-modules.sh) starts with the SPDX header; notices come from
   `AppInfo` (Infrastructure.cs): --help, Tools > About and license, startup log line, assembly Copyright.
   LICENSE is copied to the build output
 

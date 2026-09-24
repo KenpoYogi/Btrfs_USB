@@ -1,10 +1,10 @@
 // Btrfs USB Mounter
-// Copyright (c) 2026 Jay W
-// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 Jay Weiner
+// SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
-// Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
-// no commercial use of any kind is permitted. See the LICENSE file or
-// https://polyformproject.org/licenses/noncommercial/1.0.0/
+// Licensed under the MIT License with the Commons Clause License Condition v1.0:
+// you may use, copy, modify and distribute it, but not sell it or a product or service
+// whose value derives substantially from it. See the LICENSE file.
 
 using System;
 using System.Globalization;
@@ -17,10 +17,10 @@ namespace BtrfsUsbMounter.Core
     /// <summary>Copyright and license notices, shared by the window, the command line and the log.</summary>
     public static class AppInfo
     {
-        public const string Copyright = "Copyright (c) 2026 Jay W";
-        public const string LicenseName = "PolyForm Noncommercial License 1.0.0";
-        public const string LicenseUrl = "https://polyformproject.org/licenses/noncommercial/1.0.0/";
-        public const string LicenseSummary = "Free for noncommercial use only. Commercial use of any kind is not permitted.";
+        public const string Copyright = "Copyright (c) 2026 Jay Weiner";
+        public const string LicenseName = "MIT License with the Commons Clause License Condition v1.0";
+        public const string LicenseUrl = "https://commonsclause.com/";
+        public const string LicenseSummary = "Free to use, copy, modify and share. Selling it, or a product or service whose value derives substantially from it, is not permitted.";
         public const string NoWarranty = "Provided as is, without warranty or liability of any kind (see the license).";
 
         /// <summary>Full license text shipped next to the program.</summary>

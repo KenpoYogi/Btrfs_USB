@@ -1,11 +1,11 @@
 #!/bin/sh
 # Btrfs USB Mounter
-# Copyright (c) 2026 Jay W
-# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Copyright (c) 2026 Jay Weiner
+# SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 #
-# Licensed under the PolyForm Noncommercial License 1.0.0. Noncommercial use only:
-# no commercial use of any kind is permitted. See the LICENSE file or
-# https://polyformproject.org/licenses/noncommercial/1.0.0/
+# Licensed under the MIT License with the Commons Clause License Condition v1.0:
+# you may use, copy, modify and distribute it, but not sell it or a product or service
+# whose value derives substantially from it. See the LICENSE file.
 #
 # Builds filesystem kernel modules for the RUNNING WSL2 kernel (Microsoft's kernel, not the
 # distro's kernel-default package, which WSL never boots) and installs them where modprobe finds
