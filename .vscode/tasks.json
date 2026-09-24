@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/BtrfsUsbMounter.csproj", "-c", "Debug", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build release",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/BtrfsUsbMounter.csproj", "-c", "Release", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "group": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["clean", "${workspaceFolder}/BtrfsUsbMounter.csproj"],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "run release (elevated)",
+      "type": "shell",
+      "command": "Start-Process -FilePath '${workspaceFolder}\\bin\\Release\\net48\\BtrfsUsbMounter.exe'",
+      "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
+      "dependsOn": "build release",
+      "problemMatcher": []
+    }
+  ]
+}

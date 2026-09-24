@@ -1,0 +1,4 @@
+{
+  "files.exclude": { "**/bin": true, "**/obj": true },
+  "editor.rulers": [120]
+}

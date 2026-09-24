@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Btrfs USB Mounter - .NET Framework 4.8 / C# 7.3 / WinForms, no NuGet packages.
+    Build:  dotnet build -c Release      (needs the .NET SDK + .NET Framework 4.8 Developer Pack)
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>BtrfsUsbMounter</RootNamespace>
+    <AssemblyName>BtrfsUsbMounter</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- a 32-bit process would be redirected away from the real wsl.exe -->
+    <Prefer32Bit>false</Prefer32Bit>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+
+    <Version>2.0.0</Version>
+    <Product>Btrfs USB Mounter</Product>
+    <Description>Mount btrfs-formatted USB drives on Windows through WSL2</Description>
+    <Company>Jay</Company>
+    <Copyright>Copyright (c) 2026</Copyright>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- System, System.Core, System.Drawing, System.Runtime.Serialization, System.Xml are implicit -->
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Management" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="assets\app.ico" />
+    <None Include="README.md" />
+  </ItemGroup>
+
+</Project>
