@@ -2,7 +2,7 @@
 
 Standalone Windows desktop tool (NOT a Cimatron plugin; no Cimatron/ACIS references).
 Mounts Linux/Mac-formatted USB drives through WSL2 (`wsl --mount --type <fs>`): btrfs, ext2/3/4 and
-XFS read/write with the stock kernel; JFS, ReiserFS, HFS+, ZFS and APFS (rw experimental) with
+XFS read/write with the stock kernel; JFS, ReiserFS (kernels before 6.13), HFS+, ZFS and APFS (rw experimental) with
 modules built by tools/build-wsl-modules.sh; APFS read-only via fsapfsmount (FUSE) otherwise;
 Reiser4 detect-only. It started as a btrfs tool because the
 WinBtrfs driver is blocked by the Windows "Cross Certificates for Code Integrity Exceptions"
@@ -62,7 +62,11 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   distro fail (vdev.open_failed); block devices (/dev/sdX from wsl --mount --bare, loop devices) work
 - `zfs` requires `zfs-kmp` (RPM dependency), so openSUSE's kernel-default/zfs-kmp-default stay installed
 - Rebuild modules after `wsl --update`. `FsSupport` uses `modinfo` (no loading); modules load right before mount
-- Verified on this machine (2026-09-23, kernel 6.6.87.2): all 7 modules load; JFS rw + fsck clean;
+- Current WSL kernel (2026-09-24, after `wsl --update`): 6.18.33.2-microsoft-standard-WSL2. The
+  6.6.87.2 modules are gone (`/lib/modules/<release>/extra` does not exist) and need rebuilding.
+  Nothing below is verified on 6.18 yet. ReiserFS was removed in Linux 6.13: the script skips it
+  when the tree has no fs/reiserfs, so on 6.18 ReiserFS is detect-only
+- Verified earlier on kernel 6.6.87.2 only (2026-09-23): all 7 modules load; JFS rw + fsck clean;
   APFS kernel ro by default, readwrite + fsck.apfs clean; ZFS pool on a loop device: import by GUID
   under /mnt/wsl, zfs get, export; real-pool ZFS detection matches blkid. HFS+/ReiserFS: load only
 - Test fixtures are made with mkfs in WSL (e2fsprogs, xfsprogs, jfsutils, apfsprogs, btrfsprogs

@@ -424,7 +424,7 @@ namespace BtrfsUsbMounter.UI
                 return;
             }
             DialogResult answer = UiKit.Show(this,
-                "Build the JFS, ReiserFS, HFS+, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
+                "Build the JFS, ReiserFS (kernels before 6.13 only), HFS+, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
                 "This installs compilers in the distro (openSUSE: zypper), downloads the WSL kernel source (about 250 MB), " +
                 "OpenZFS and linux-apfs-rw, and compiles them. The first run takes 15-40 minutes; later runs are quicker. " +
                 "Other tasks wait until it finishes. Rerun it after every \"wsl --update\".\r\n\r\n" +

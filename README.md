@@ -9,6 +9,18 @@ WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline che
 - Uses the same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version, so
   settings and mount state carry over
 
+## Setting up WSL2 and a Linux distro
+
+New to WSL? The step-by-step guides in [docs/distros](docs/distros/README.md) cover turning on WSL2,
+installing a distro and adding the packages the app needs. They also show what works on each distro:
+
+[openSUSE Tumbleweed](docs/distros/opensuse-tumbleweed.md) (recommended) ·
+[openSUSE Leap](docs/distros/opensuse-leap.md) ·
+[SUSE Linux Enterprise Server](docs/distros/sles.md) ·
+[Ubuntu](docs/distros/ubuntu.md) · [Fedora](docs/distros/fedora.md) ·
+[Kali Linux](docs/distros/kali.md) · [Debian](docs/distros/debian.md) ·
+[CentOS / AlmaLinux](docs/distros/centos.md) · [Arch Linux](docs/distros/arch.md)
+
 ## Prerequisites (one time)
 
 1. **.NET SDK** (8 or later): https://dotnet.microsoft.com/download - provides `dotnet build`.
@@ -39,8 +51,11 @@ programs uses the `clr` debugger of the C# extension (Windows only).
 ## Install / migrate from the PowerShell version
 
 1. Exit the PowerShell tool (tray icon > Exit).
-2. Copy `BtrfsUsbMounter.exe`, `BtrfsUsbMounter.exe.config` **and** `BtrfsUsbMounter.com` to a permanent folder,
-   e.g. `C:\Tools\BtrfsUsbMounter\`.
+2. Copy everything in `bin\Release\net48\` to a permanent folder, e.g. `C:\Tools\BtrfsUsbMounter\`:
+   `BtrfsUsbMounter.exe`, `BtrfsUsbMounter.exe.config`, `BtrfsUsbMounter.com`, `LICENSE` **and the
+   `tools\` folder** (with `build-wsl-modules.sh` inside), keeping the same layout. Without `tools\`,
+   **Tools > Build filesystem drivers** fails with *The driver build script is missing*; without
+   `LICENSE`, **About and license** falls back to the web page. (The `.pdb` file is optional.)
 3. Start `BtrfsUsbMounter.exe`. On first start it:
    - reads your existing settings and mounted drives,
    - notices that the "start at logon" task still points at the PowerShell script and
@@ -64,7 +79,7 @@ Whether a filesystem can be mounted depends on the WSL kernel, and is checked at
 | ext2, ext3, ext4 | yes | read/write | `wsl --mount --type ext2/ext3/ext4` (built into the WSL kernel) |
 | XFS | yes | read/write | `wsl --mount --type xfs` (built into the WSL kernel) |
 | JFS | yes | read/write* | `wsl --mount --type jfs` with the locally built `jfs` module |
-| ReiserFS 3.x | yes | read/write* | `wsl --mount --type reiserfs` with the locally built `reiserfs` module |
+| ReiserFS 3.x | yes | read/write* on WSL kernels before 6.13 | `wsl --mount --type reiserfs` with the locally built `reiserfs` module; Linux 6.13 removed ReiserFS, so on newer WSL kernels it is detect-only (the build skips it) |
 | HFS+ / HFSX | yes | read/write* | `wsl --mount --type hfsplus` with the locally built `hfsplus` module; journaled volumes mount read-only |
 | ZFS | yes | read/write* | `wsl --mount --bare`, then `zpool import -R /mnt/wsl` (locally built OpenZFS module + `zfs` package); eject = `zpool export` |
 | APFS | yes | read-only, or read/write* (experimental) | read-only: `fsapfsmount` (FUSE, package `libfsapfs`), all volumes; read/write: the locally built `linux-apfs-rw` driver after **Tools > Allow APFS writes**, first volume only; no FileVault |
@@ -75,7 +90,8 @@ Whether a filesystem can be mounted depends on the WSL kernel, and is checked at
 distro's `*-kmp-default` packages are built for openSUSE's own kernel, which WSL never boots. The script:
 
 1. downloads the WSL kernel source for `uname -r` from github.com/microsoft/WSL2-Linux-Kernel and
-   configures it with the running kernel's `/proc/config.gz`, plus JFS, ReiserFS, HFS+ and HFS as modules
+   configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS and (before
+   Linux 6.13) ReiserFS as modules
 2. builds vmlinux once for symbol versions and checks them against Microsoft's own `btrfs.ko`
 3. builds the in-tree drivers, OpenZFS (same version as the installed `zfs` package) and linux-apfs-rw
 4. installs them in `/lib/modules/<release>/extra` (persistent), runs `depmod`, and loads each to test it
@@ -212,4 +228,5 @@ which open-source licenses may not do.
 | Nothing happens on start | Another copy is running hidden; the new launch offers to end it after 2 s |
 | Drive not listed | Tick *Include non-USB disks* (some enclosures report as SCSI), click Refresh |
 | Mount fails | The log shows the error, a hint and, if relevant, the kernel messages |
+| "The driver build script is missing" | Copy the `tools\` folder from `bin\Release\net48\` next to `BtrfsUsbMounter.exe` |
 | Logs | `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` (see Logging above); check reports in the `checks` subfolder |

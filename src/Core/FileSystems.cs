@@ -123,6 +123,12 @@ namespace BtrfsUsbMounter.Core
                 return "Reiser4 was never part of mainline Linux, and its out-of-tree patches stop at Linux 5.16, so there is " +
                        "no driver for the WSL kernel (6.x).";
             }
+            if (kind == FsKind.ReiserFs)
+            {
+                return "No ReiserFS driver is installed for the running WSL kernel. ReiserFS was removed from Linux 6.13, so " +
+                       "Tools > Build filesystem drivers can only build it for WSL kernels older than 6.13 (see uname -r); " +
+                       "on newer kernels it skips ReiserFS. Copy the data off on a Linux system with an older kernel.";
+            }
             if (Buildable(kind))
             {
                 return "No " + DisplayName(kind) + " driver is installed for the running WSL kernel. Use Tools > Build filesystem " +
@@ -717,9 +723,10 @@ namespace BtrfsUsbMounter.Core
                         return "The ZFS driver is installed but the zpool tool is missing in the WSL distro: install the " +
                                "package zfs (openSUSE filesystems repository) or zfsutils-linux (Debian, Ubuntu), then click Refresh.";
                     }
-                    return "Mounting APFS needs a driver: install the package libfsapfs (openSUSE, Fedora) or libfsapfs-utils " +
-                           "(Debian, Ubuntu) for read-only access, or build the APFS kernel driver with Tools > Build filesystem " +
-                           "drivers, then click Refresh.";
+                    return "Mounting APFS needs a driver: install the package libfsapfs (openSUSE; SLES from Package Hub) or " +
+                           "libfsapfs-utils (Debian 13, Ubuntu 24.04; the Ubuntu 26.04 and Kali builds lack FUSE support) for " +
+                           "read-only access, or build the APFS kernel driver with Tools > Build filesystem drivers (openSUSE), " +
+                           "then click Refresh.";
                 default:
                     return null;
             }

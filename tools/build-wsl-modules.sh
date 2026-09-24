@@ -15,8 +15,9 @@
 #
 # Rerun after "wsl --update": a new WSL kernel needs modules built against its own source.
 # Built from:
-#   - in-tree drivers (JFS, ReiserFS, HFS+, HFS) from github.com/microsoft/WSL2-Linux-Kernel at the
-#     tag matching uname -r, configured with the running kernel's own /proc/config.gz
+#   - in-tree drivers (JFS, HFS+, HFS, and ReiserFS on kernels before 6.13, which removed it) from
+#     github.com/microsoft/WSL2-Linux-Kernel at the tag matching uname -r, configured with the
+#     running kernel's own /proc/config.gz
 #   - OpenZFS (github.com/openzfs/zfs), same version as the installed zfs userspace package
 #   - linux-apfs-rw (github.com/linux-apfs/linux-apfs-rw); its write support is experimental
 set -eu
@@ -34,6 +35,11 @@ want() { case " $WANT " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
 [ "$(id -u)" = 0 ] || { echo "Run as root (wsl -u root)."; exit 1; }
 case "$KVER" in *microsoft*WSL2*) ;; *) echo "Not a WSL2 kernel: $KVER"; exit 1 ;; esac
+command -v zypper >/dev/null 2>&1 || {
+    echo "This script needs openSUSE (zypper and rpm). Install openSUSE-Tumbleweed in WSL and build there:"
+    echo "  wsl --install -d openSUSE-Tumbleweed"
+    exit 1
+}
 
 log "Kernel $KVER, building: $WANT"
 # Use the compiler major version that built the running kernel, to stay as close to Microsoft's build as
@@ -112,6 +118,11 @@ fi
 # ---- in-tree filesystem drivers ---------------------------------------------------------------
 for fs in jfs reiserfs hfsplus; do
     want "$fs" || continue
+    if [ ! -d "fs/$fs" ]; then
+        # ReiserFS was removed from mainline Linux in 6.13, so newer WSL kernels have no source for it
+        log "Skipping $fs: this kernel tree ($BASE) has no fs/$fs (ReiserFS was removed in Linux 6.13)"
+        continue
+    fi
     dirs="fs/$fs"
     [ "$fs" = hfsplus ] && dirs="fs/hfsplus fs/hfs"
     extra=""
