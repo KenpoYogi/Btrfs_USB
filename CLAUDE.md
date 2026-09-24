@@ -51,21 +51,44 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - Scrub, drive info, offline check are btrfs-only; the Mount options box is btrfs-only
 - Mount methods (`MountEntry.MountMethod`): kernel (`wsl --mount --type`), fuse (APFS via
   fsapfsmount), zfs (`--bare` + `zpool import -R /mnt/wsl <guid>`, never `-f`; eject = `zpool export`)
-- Locally built modules live in `/lib/modules/$(uname -r)/extra` in the distro (persistent overlay).
+- Locally built modules: WSL mounts /lib/modules/<release> as an overlay whose upper layer is NOT on
+  the distro disk (it is in the VM, lost on every WSL restart; the 6.6 modules vanished that way, not
+  because of wsl --update). The script keeps them in /var/lib/wsl-modules/<release> and installs a
+  copy in /lib/modules/<release>/extra (+ depmod, marker .restored); `FsSupport.RestoreModules` puts
+  them back before the support check and before every module load.
   WSL module signing is off. Config must be EXACTLY /proc/config.gz plus the added =m drivers:
   turning DEBUG_INFO_BTF off changed struct module (DEBUG_INFO_BTF_MODULES) and 250 of 582 CRCs.
   resolve_btfids fails with new glibc: fixed with HOSTCFLAGS=-Wno-error=discarded-qualifiers (host
-  tools only). Built with gcc-11 like Microsoft (devel:gcc Factory, temporary repo). JFS needs
-  KBUILD_EXTRA_SYMBOLS from fs/nls (nls_ucs2_utils is a shipped module). OpenZFS needs KERNEL_CC and a
-  "gcc" shim. linux-apfs-rw needs ./genver.sh first. The script checks CRCs against btrfs.ko.
+  tools only). Built with the gcc major that built the running kernel (6.6: gcc-11 from devel:gcc
+  Factory, temporary repo; 6.18: gcc-13 from Tumbleweed). JFS needs KBUILD_EXTRA_SYMBOLS from
+  fs/nls (nls_ucs2_utils is a shipped module). OpenZFS needs KERNEL_CC and a "gcc" shim.
+  linux-apfs-rw needs ./genver.sh first. The script checks CRCs against btrfs.ko.
+- Leap 16.0 / SLES: gcc13 is in their own repos (SLES 15 SP7: Development Tools module); zfs, jfsutils,
+  apfsprogs come from download.opensuse.org/repositories/filesystems/{16.0,15.7,SLE_15_SP6}. The
+  script's devel:gcc Factory fallback is Tumbleweed-only. Driver build untested on Leap/SLES
+- When running the build by hand, redirect its output to a file INSIDE WSL (sh -c '... > file'):
+  long output relayed through wsl.exe stdout lost lines. Don't edit the script while it runs (sh
+  reads it as it goes): run a copy
 - ZFS vdevs are opened from kernel threads in the VM's root mount namespace: file vdevs inside the
   distro fail (vdev.open_failed); block devices (/dev/sdX from wsl --mount --bare, loop devices) work
 - `zfs` requires `zfs-kmp` (RPM dependency), so openSUSE's kernel-default/zfs-kmp-default stay installed
 - Rebuild modules after `wsl --update`. `FsSupport` uses `modinfo` (no loading); modules load right before mount
-- Current WSL kernel (2026-09-24, after `wsl --update`): 6.18.33.2-microsoft-standard-WSL2. The
-  6.6.87.2 modules are gone (`/lib/modules/<release>/extra` does not exist) and need rebuilding.
-  Nothing below is verified on 6.18 yet. ReiserFS was removed in Linux 6.13: the script skips it
-  when the tree has no fs/reiserfs, so on 6.18 ReiserFS is detect-only
+- Toolchain probes (CC_HAS_*, GCC_ASM_GOTO_OUTPUT_BROKEN, ...) are recomputed from OUR compiler.
+  6.18 was built with GCC 13.2.0, Tumbleweed has gcc-13 13.5.0: CC_HAS_SANE_FUNCTION_ALIGNMENT turned
+  `__cold` on and changed the CRCs of _printk, panic, __fortify_panic. The script pins every probe
+  that differs to /proc/config.gz by rewriting its Kconfig entry (pin_kconfig), then reruns
+  olddefconfig. GCC_PLUGINS=y in Microsoft's build but off here (no plugin headers): harmless, no
+  plugin is enabled and it only adds a rebuild trigger (compiler-version.h)
+- Current WSL kernel (2026-09-24, after `wsl --update`): 6.18.33.2-microsoft-standard-WSL2, built
+  with GCC 13. ReiserFS was removed in Linux 6.13: the script skips it (no fs/reiserfs), so on 6.18
+  ReiserFS is detect-only
+- Verified on 6.18.33.2 (2026-09-24): build with pinned probes, 608/608 btrfs.ko CRCs match; jfs,
+  hfs, hfsplus, spl, zfs (2.4.4) and apfs load, no "disagrees about version" in dmesg. Loop-device tests
+  (all pass): btrfs/ext4/xfs rw + sync -f; JFS rw, data survives remount, fsck.jfs clean; APFS kernel
+  ro by default, -o readwrite write + remount, fsck.apfs clean; fsapfsmount reads it; HFS+/HFS load
+  only (no mkfs.hfsplus in Tumbleweed); ZFS create/export, import by GUID -R /mnt/wsl, write, scrub,
+  export. Restore after a simulated restart (extra deleted, modules unloaded): detected + loaded.
+  NOT tested: the app itself (wsl --mount needs an elevated shell), real USB disks, a real wsl --shutdown
 - Verified earlier on kernel 6.6.87.2 only (2026-09-23): all 7 modules load; JFS rw + fsck clean;
   APFS kernel ro by default, readwrite + fsck.apfs clean; ZFS pool on a loop device: import by GUID
   under /mnt/wsl, zfs get, export; real-pool ZFS detection matches blkid. HFS+/ReiserFS: load only

@@ -318,10 +318,13 @@ namespace BtrfsUsbMounter.Core
             return volume.ReadOnly;
         }
 
-        /// <summary>Loads the driver module (a WSL restart unloads locally built ones); built-in drivers need nothing.</summary>
+        /// <summary>
+        /// Loads the driver module; built-in drivers need nothing. A WSL restart unloads locally built modules
+        /// and also removes them from /lib/modules, so they are restored from the distro's disk first.
+        /// </summary>
         private static async Task LoadModuleAsync(string distro, string module, CancellationToken ct)
         {
-            WslResult r = await Wsl.RunRootAsync(distro,
+            WslResult r = await Wsl.RunRootAsync(distro, FsSupport.RestoreModules +
                 "grep -qw " + module + " /proc/filesystems || modprobe " + module + " 2>&1", 60, ct).ConfigureAwait(false);
             if (r.ExitCode != 0) Log.Warn("Loading the " + module + " driver failed: " + r.Combined);
         }

@@ -94,11 +94,15 @@ distro's `*-kmp-default` packages are built for openSUSE's own kernel, which WSL
    Linux 6.13) ReiserFS as modules
 2. builds vmlinux once for symbol versions and checks them against Microsoft's own `btrfs.ko`
 3. builds the in-tree drivers, OpenZFS (same version as the installed `zfs` package) and linux-apfs-rw
-4. installs them in `/lib/modules/<release>/extra` (persistent), runs `depmod`, and loads each to test it
+4. keeps them in `/var/lib/wsl-modules/<release>` on the distro's disk, installs them in
+   `/lib/modules/<release>/extra`, runs `depmod`, and loads each to test it. WSL keeps `/lib/modules/<release>`
+   in memory, so after a WSL restart the app copies the drivers back (and runs `depmod`) before it
+   checks or loads them
 
 Rerun it after every `wsl --update`: a new WSL kernel needs its own build. The first run takes
 20-40 minutes and about 5 GB of disk space in the distro (`/usr/src/wsl-modules`); later runs reuse
-it. It uses GCC 11 like Microsoft's build (installed from openSUSE's devel:gcc project if needed) and
+it. It uses the GCC major version that built the running kernel (installed from openSUSE's devel:gcc
+project if needed), pins the compiler feature checks to the running kernel's values, and
 refuses to install anything if the symbol versions differ from the running kernel.
 
 Notes:

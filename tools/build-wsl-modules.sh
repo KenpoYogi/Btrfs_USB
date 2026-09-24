@@ -27,11 +27,34 @@ BASE=${KVER%%-*}                      # e.g. 6.6.87.2
 WORK=/usr/src/wsl-modules
 KSRC=$WORK/WSL2-Linux-Kernel-linux-msft-wsl-$BASE
 DEST=/lib/modules/$KVER/extra
+# WSL keeps /lib/modules/<release> in an overlay whose writable layer is in memory, so anything in DEST
+# is gone after a WSL restart. The built modules are kept here, on the distro's disk, and Btrfs USB
+# Mounter copies them back into DEST (plus depmod) when they are missing.
+STORE=/var/lib/wsl-modules/$KVER
 JOBS=$(nproc)
 WANT=${*:-jfs reiserfs hfsplus zfs apfs}
 
 log() { printf '\n==== %s\n' "$*"; }
 want() { case " $WANT " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
+# Kconfig symbols that probe the toolchain (no prompt, so .config can't set them): the ones whose value
+# differs between the running kernel's config and ours
+PROBES='^CONFIG_(CC_HAS_|CC_CAN_|CC_NO_|GCC_ASM_|AS_HAS_|AS_WRITES_|LD_HAS_|LD_CAN_|TOOLCHAIN_HAS_|TOOLS_SUPPORT_)[A-Z0-9_]*='
+probe_diff() {
+    { zcat /proc/config.gz | grep -E "$PROBES"; grep -E "$PROBES" .config; } |
+        sort | uniq -u | sed 's/^CONFIG_//; s/=.*//' | sort -u
+}
+# Rewrite "config SYM" in the tree's Kconfig so it is always $2 (y/n): drops its own type, default and
+# depends lines and puts "def_bool $2" in their place. Safe to repeat.
+pin_kconfig() {
+    f=$(grep -rlx --include='Kconfig*' "\(menu\)\?config $1" . | head -1)
+    [ -n "$f" ] || return 1
+    awk -v sym="$1" -v val="$2" '
+        /^(menu)?config / { blk = ($2 == sym); print; if (blk) print "\tdef_bool " val; next }
+        /^(choice|endchoice|menu|endmenu|if|endif|source|comment)([ \t]|$)/ { blk = 0 }
+        blk && /^[ \t]+(def_bool|default|depends on|bool[ \t]*$)/ { next }
+        { print }' "$f" > "$f.pin" && mv "$f.pin" "$f"
+}
 
 [ "$(id -u)" = 0 ] || { echo "Run as root (wsl -u root)."; exit 1; }
 case "$KVER" in *microsoft*WSL2*) ;; *) echo "Not a WSL2 kernel: $KVER"; exit 1 ;; esac
@@ -43,8 +66,8 @@ command -v zypper >/dev/null 2>&1 || {
 
 log "Kernel $KVER, building: $WANT"
 # Use the compiler major version that built the running kernel, to stay as close to Microsoft's build as
-# possible (compiler-dependent config options such as CC_HAS_* follow it). Tumbleweed no longer ships
-# gcc11; openSUSE's devel:gcc project still builds it for Factory.
+# possible (6.6 kernels: gcc-11, which Tumbleweed no longer ships, so it comes from openSUSE's devel:gcc
+# project; 6.18: gcc-13). Point releases still differ, so the toolchain probes are pinned below.
 KGCC=$(sed -n 's/.*gcc (GCC) \([0-9][0-9]*\)\..*/\1/p' /proc/version)
 CC_BIN=gcc-${KGCC:-13}
 # host tools only (resolve_btfids/libbpf): newer glibc headers turn a const warning into -Werror
@@ -54,6 +77,13 @@ zypper --non-interactive --quiet install --no-recommends make flex bison bc libe
     dwarves python3 perl rsync tar gzip xz curl git kmod >/dev/null
 if ! command -v "$CC_BIN" >/dev/null; then
     if ! zypper --non-interactive --quiet install --no-recommends "gcc$KGCC" >/dev/null 2>&1; then
+        # the devel:gcc fallback below is built for Tumbleweed; Leap and SLES have gcc13 in their own
+        # repositories (SLES 15: Development Tools module)
+        if ! grep -q '^ID="\?opensuse-tumbleweed' /etc/os-release; then
+            echo "gcc$KGCC is not in the configured repositories. Install it first (zypper install gcc$KGCC;"
+            echo "on SLES 15 add the Development Tools module: SUSEConnect -p sle-module-development-tools/15.7/x86_64)."
+            exit 1
+        fi
         # add devel:gcc just for this install (low priority, so it never replaces distro packages), then remove it
         echo "gcc$KGCC is not in the configured repositories; installing it from openSUSE devel:gcc (Factory)"
         zypper --non-interactive --quiet --gpg-auto-import-keys addrepo --refresh --priority 150 \
@@ -66,7 +96,7 @@ if ! command -v "$CC_BIN" >/dev/null; then
 fi
 command -v "$CC_BIN" >/dev/null || { echo "$CC_BIN not found"; exit 1; }
 
-mkdir -p "$WORK" "$DEST"
+mkdir -p "$WORK" "$STORE"
 cd "$WORK"
 
 # ---- WSL kernel source, configured exactly like the running kernel ----------------------------
@@ -78,7 +108,7 @@ if [ ! -f "$KSRC/Makefile" ]; then
     rm -f "linux-msft-wsl-$BASE.tar.gz"
 fi
 cd "$KSRC"
-STAMP="$CC_BIN keep-btf"
+STAMP="$CC_BIN keep-btf pin-probes"
 if [ ! -f vmlinux.symvers ] || ! cmp -s /proc/config.gz .running-config.gz || [ "$(cat .built-with 2>/dev/null)" != "$STAMP" ]; then
     log "Configuring from /proc/config.gz"
     zcat /proc/config.gz > .config
@@ -92,6 +122,22 @@ if [ ! -f vmlinux.symvers ] || ! cmp -s /proc/config.gz .running-config.gz || [ 
     # Everything else stays exactly as Microsoft configured it, debug info and BTF included:
     # DEBUG_INFO_BTF_MODULES adds fields to struct module, so turning BTF off changes the module ABI.
     make -s CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" olddefconfig
+    # Toolchain probes are answered by OUR compiler, and a newer point release can answer differently
+    # (GCC 13.5 vs Microsoft's 13.2.0: CC_HAS_SANE_FUNCTION_ALIGNMENT turns __cold on, which changes the
+    # symbol CRCs of _printk and panic). Pin every probe that differs to the running kernel's value.
+    pinned=""
+    for sym in $(probe_diff); do
+        val=n
+        zcat /proc/config.gz | grep -qx "CONFIG_$sym=y" && val=y
+        pin_kconfig "$sym" "$val" || { echo "Cannot find config $sym in the kernel tree"; exit 1; }
+        pinned="$pinned $sym=$val"
+    done
+    if [ -n "$pinned" ]; then
+        echo "Pinned toolchain checks to the running kernel's values:$pinned"
+        make -s CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" olddefconfig
+        left=$(probe_diff)
+        [ -z "$left" ] || { echo "Toolchain checks still differ from the running kernel:" $left; exit 1; }
+    fi
     # the release string must match uname -r exactly, or modprobe refuses the modules
     built=$(make -s CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" kernelrelease)
     [ "$built" = "$KVER" ] || { echo "Kernel release mismatch: built $built, running $KVER"; exit 1; }
@@ -135,7 +181,7 @@ for fs in jfs reiserfs hfsplus; do
     for d in $dirs; do
         log "Building $d"
         make -s -j"$JOBS" CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" M="$d" $extra modules
-        cp "$d"/*.ko "$DEST"/
+        cp "$d"/*.ko "$STORE"/
     done
 done
 
@@ -162,7 +208,7 @@ if want zfs; then
     PATH="$SHIM:$PATH" ./configure --quiet --with-config=kernel --with-linux="$KSRC" --with-linux-obj="$KSRC" \
         CC="$CC_BIN" KERNEL_CC="$CC_BIN"
     PATH="$SHIM:$PATH" make -s -j"$JOBS"
-    find module -name '*.ko' -exec cp {} "$DEST"/ \;
+    find module -name '*.ko' -exec cp {} "$STORE"/ \;
 fi
 
 # ---- APFS (linux-apfs-rw) ---------------------------------------------------------------------
@@ -178,11 +224,15 @@ if want apfs; then
     ./genver.sh   # writes version.h, as the project's own Makefile does
     # mounts stay read-only unless mounted with -o readwrite (not built with CONFIG_APFS_RW_ALWAYS)
     make -s -j"$JOBS" -C "$KSRC" CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" M="$PWD" modules
-    cp apfs.ko "$DEST"/
+    cp apfs.ko "$STORE"/
 fi
 
-log "Installing into $DEST"
+log "Installing into $DEST (kept in $STORE)"
+rm -rf "$DEST"
+mkdir -p "$DEST"
+cp "$STORE"/*.ko "$DEST"/
 depmod -a "$KVER"
+touch "$DEST/.restored"
 ls -l "$DEST"
 log "Loading to verify"
 status=0

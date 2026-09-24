@@ -612,6 +612,17 @@ namespace BtrfsUsbMounter.Core
             public bool ZfsTools;
         }
 
+        /// <summary>
+        /// Shell prefix that puts the locally built modules back after a WSL restart. WSL keeps
+        /// /lib/modules/&lt;release&gt; in an overlay whose writable layer is in memory, so
+        /// tools/build-wsl-modules.sh also keeps them in /var/lib/wsl-modules/&lt;release&gt; on the distro's
+        /// disk. When they are missing this copies them back and runs depmod, and prints "r:restored".
+        /// </summary>
+        public const string RestoreModules =
+            "K=$(uname -r); S=/var/lib/wsl-modules/$K; D=/lib/modules/$K/extra; " +
+            "if [ ! -e \"$D/.restored\" ] && ls \"$S\"/*.ko >/dev/null 2>&1; then " +
+            "mkdir -p \"$D\" && cp -f \"$S\"/*.ko \"$D\"/ && depmod -a \"$K\" && touch \"$D/.restored\" && echo r:restored; fi; ";
+
         private readonly ConcurrentDictionary<string, DistroSupport> byDistro =
             new ConcurrentDictionary<string, DistroSupport>(StringComparer.Ordinal);
 
@@ -673,7 +684,7 @@ namespace BtrfsUsbMounter.Core
         {
             if (string.IsNullOrEmpty(distro)) return;
             string kinds = string.Join(" ", KernelKinds.Select(FsTypes.Name));
-            string script =
+            string script = RestoreModules +
                 "for t in " + kinds + "; do " +
                 "if grep -qw \"$t\" /proc/filesystems || modinfo -n \"$t\" >/dev/null 2>&1; then echo \"k:$t=yes\"; else echo \"k:$t=no\"; fi; done; " +
                 "if command -v fsapfsmount >/dev/null 2>&1 && grep -qw fuse /proc/filesystems; then echo t:fsapfsmount=yes; else echo t:fsapfsmount=no; fi; " +
@@ -697,6 +708,7 @@ namespace BtrfsUsbMounter.Core
                 }
                 else if (t.StartsWith("t:fsapfsmount=", StringComparison.Ordinal)) s.ApfsFuse = yes;
                 else if (t.StartsWith("t:zpool=", StringComparison.Ordinal)) s.ZfsTools = yes;
+                else if (t == "r:restored") Log.Debug("Restored the locally built drivers in " + distro + " after a WSL restart.");
             }
             byDistro[distro] = s;
             Log.Debug("Filesystem support in " + distro + ": kernel drivers " + string.Join(", ", s.Kernel.Select(FsTypes.DisplayName)) +
