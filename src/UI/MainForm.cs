@@ -861,8 +861,8 @@ namespace BtrfsUsbMounter.UI
             if (list.Items.Count > 0 && list.SelectedItems.Count == 0) list.Items[0].Selected = true;
             list.EndUpdate();
             emptyLabel.Visible = list.Items.Count == 0;
-            emptyLabel.Text = "No supported filesystems found.\r\n\r\nPlug in a USB hard drive with btrfs, ext2/3/4, XFS, JFS, ReiserFS, " +
-                              "Reiser4, ZFS, HFS+, APFS or UFS - it will appear here automatically.";
+            emptyLabel.Text = "No supported filesystems found.\r\n\r\nPlug in a USB hard drive with btrfs, ext2/3/4, XFS, JFS, " +
+                              "ZFS, HFS+, APFS or UFS/UFS2 - it will appear here automatically.";
             UpdateButtonState();
         }
 

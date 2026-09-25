@@ -8,7 +8,15 @@
 
 ---
 
-## ⭐ (this commit) — **UFS1 / UFS2 (FREEBSD, NETBSD, OPENBSD): DETECTED, MOUNTED READ-ONLY, READ/WRITE OPT-IN WITH A PATCHED DRIVER THAT FREEBSD ACCEPTS.** _2026-09-25. Evidence: user request ("add UFS and UFS2 support", then "read/write if possible, and update all the distro docs"). Driver built on 6.18.33.2 in Tumbleweed and Kali (CRCs match, 7 modules load, `wsl_handoff=1`); patch applies and compiles on the 6.6 tree too. **FreeBSD 15.1 in QEMU/KVM inside WSL:** `newfs -U -j` UFS2 (SU+J + check hashes) and `newfs -O1 -U` UFS1 → Linux ro and rw writes → FreeBSD `fsck_ffs -n` clean, 3161 / 3160 checksums match, FreeBSD writes after, clean; crash copy (taken while rw-mounted) refused rw by FreeBSD, `fsck -p` skips the stale journal and does a full check. Kali: NetBSD `makefs` UFS1 written (incl. ENOSPC) → FreeBSD fsck clean, 1386 checksums match. Probe run on 8 real superblocks (FreeBSD, makefs, crafted unclean). `dotnet build -c Release`: 0 warnings. **The app itself has not mounted a UFS disk** (wsl --mount needs an elevated shell)._
+## ⭐ (this commit) — **EMPTY DRIVE LIST TEXT: REISERFS AND REISER4 REMOVED, "UFS" → "UFS/UFS2".** _2026-09-25. Evidence: user request ("In the dialogue background remove the words ReiserFS and Reiser4 please. Also change UFS to UFS/UFS2"). `dotnet build -c Release`: 0 errors. Not run in the GUI._
+
+- `MainForm.emptyLabel` now reads "...btrfs, ext2/3/4, XFS, JFS, ZFS, HFS+, APFS or UFS/UFS2 - it will appear here
+  automatically." Detection unchanged. `--help` (`src/Program.cs`) still lists ReiserFS and Reiser4 (asked the user).
+- **Files.** `src/UI/MainForm.cs`, `RESUME.md`, this file.
+
+---
+
+## `238c76f` — **UFS1 / UFS2 (FREEBSD, NETBSD, OPENBSD): DETECTED, MOUNTED READ-ONLY, READ/WRITE OPT-IN WITH A PATCHED DRIVER THAT FREEBSD ACCEPTS.** _2026-09-25. Evidence: user request ("add UFS and UFS2 support", then "read/write if possible, and update all the distro docs"). Driver built on 6.18.33.2 in Tumbleweed and Kali (CRCs match, 7 modules load, `wsl_handoff=1`); patch applies and compiles on the 6.6 tree too. **FreeBSD 15.1 in QEMU/KVM inside WSL:** `newfs -U -j` UFS2 (SU+J + check hashes) and `newfs -O1 -U` UFS1 → Linux ro and rw writes → FreeBSD `fsck_ffs -n` clean, 3161 / 3160 checksums match, FreeBSD writes after, clean; crash copy (taken while rw-mounted) refused rw by FreeBSD, `fsck -p` skips the stale journal and does a full check. Kali: NetBSD `makefs` UFS1 written (incl. ENOSPC) → FreeBSD fsck clean, 1386 checksums match. Probe run on 8 real superblocks (FreeBSD, makefs, crafted unclean). `dotnet build -c Release`: 0 warnings. **The app itself has not mounted a UFS disk** (wsl --mount needs an elevated shell)._
 
 - **Probe** (`FsProbe.Ufs`): UFS2 at 64 KiB, UFS1 (or makefs UFS2, not mountable, noted) at 8 KiB, either byte order;
   label (fs_volname, new layout only), UUID as blkid (`%08x%08x` of fs_id), size and free space; picks `ufstype`
