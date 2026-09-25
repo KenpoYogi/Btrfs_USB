@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -16,10 +16,10 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using XnixUsbMounter.Core;
-using XnixUsbMounter.UI;
+using LinuxUsbMounter.Core;
+using LinuxUsbMounter.UI;
 
-namespace XnixUsbMounter
+namespace LinuxUsbMounter
 {
     internal static class Program
     {
@@ -234,12 +234,12 @@ namespace XnixUsbMounter
     internal sealed class CommandLineOptions
     {
         public const string Usage =
-            "Xnix USB Mounter - mount Linux and Mac USB drives through WSL2\r\n" +
+            "Linux USB Mounter - mount Linux and Mac USB drives through WSL2\r\n" +
             AppInfo.Copyright + ". Licensed under the " + AppInfo.LicenseName + ".\r\n" +
             AppInfo.LicenseSummary + "\r\n" +
             AppInfo.NoWarranty + "\r\n" +
             "Full terms: the LICENSE file next to the program, or " + AppInfo.LicenseUrl + "\r\n\r\n" +
-            "Usage: XnixUsbMounter [options]\r\n\r\n" +
+            "Usage: LinuxUsbMounter [options]\r\n\r\n" +
             "  (no options)       open the window\r\n" +
             "  --tray             start hidden in the system tray\r\n" +
             "  --list             list detected filesystems (btrfs, ext2/3/4, XFS, JFS, ZFS,\r\n" +

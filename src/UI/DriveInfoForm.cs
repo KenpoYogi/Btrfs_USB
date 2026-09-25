@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -13,9 +13,9 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using XnixUsbMounter.Core;
+using LinuxUsbMounter.Core;
 
-namespace XnixUsbMounter.UI
+namespace LinuxUsbMounter.UI
 {
     /// <summary>What the drive-info window needs from the main window.</summary>
     internal interface IDriveActions

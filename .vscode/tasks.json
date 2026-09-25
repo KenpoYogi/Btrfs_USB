@@ -5,7 +5,7 @@
       "label": "build",
       "type": "process",
       "command": "dotnet",
-      "args": ["build", "${workspaceFolder}/XnixUsbMounter.csproj", "-c", "Debug", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "args": ["build", "${workspaceFolder}/LinuxUsbMounter.csproj", "-c", "Debug", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": "$msCompile"
     },
@@ -13,7 +13,7 @@
       "label": "build release",
       "type": "process",
       "command": "dotnet",
-      "args": ["build", "${workspaceFolder}/XnixUsbMounter.csproj", "-c", "Release", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "args": ["build", "${workspaceFolder}/LinuxUsbMounter.csproj", "-c", "Release", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "group": "build",
       "problemMatcher": "$msCompile"
     },
@@ -21,13 +21,13 @@
       "label": "clean",
       "type": "process",
       "command": "dotnet",
-      "args": ["clean", "${workspaceFolder}/XnixUsbMounter.csproj"],
+      "args": ["clean", "${workspaceFolder}/LinuxUsbMounter.csproj"],
       "problemMatcher": "$msCompile"
     },
     {
       "label": "run release (elevated)",
       "type": "shell",
-      "command": "Start-Process -FilePath '${workspaceFolder}\\bin\\Release\\net48\\XnixUsbMounter.exe'",
+      "command": "Start-Process -FilePath '${workspaceFolder}\\bin\\Release\\net48\\LinuxUsbMounter.exe'",
       "options": { "shell": { "executable": "powershell.exe", "args": ["-NoProfile", "-Command"] } },
       "dependsOn": "build release",
       "problemMatcher": []

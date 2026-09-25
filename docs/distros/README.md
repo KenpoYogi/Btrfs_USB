@@ -1,6 +1,6 @@
-# Choosing a Linux distro for Xnix USB Mounter
+# Choosing a Linux distro for Linux USB Mounter
 
-Xnix USB Mounter opens Linux- and Mac-formatted USB drives through **WSL2**, the Linux system built
+Linux USB Mounter opens Linux- and Mac-formatted USB drives through **WSL2**, the Linux system built
 into Windows. WSL2 needs a Linux distribution ("distro") installed. The drives are mounted by
 Microsoft's WSL kernel, which is the same for every distro. The distro supplies the tools the app
 runs, like `btrfs`, `blkid` and `fsapfsmount`. That is why some features depend on the distro.

@@ -1,4 +1,4 @@
-# Xnix USB Mounter with openSUSE Leap
+# Linux USB Mounter with openSUSE Leap
 
 openSUSE Leap is the stable, fixed-release openSUSE. Everyday mounting works well. Leap 16.0 has
 everything the extra drivers (JFS, HFS+, UFS, ZFS, APFS read/write) need: `gcc13` in its own repositories
@@ -124,7 +124,7 @@ with `mounter.log`. As a fallback you can install Tumbleweed next to Leap
 (`wsl --install -d openSUSE-Tumbleweed`, see the [Tumbleweed guide](opensuse-tumbleweed.md)) and pick
 it in the app.
 
-1. In Xnix USB Mounter choose **Tools > Build filesystem drivers**.
+1. In Linux USB Mounter choose **Tools > Build filesystem drivers**.
 2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in the distro.
 3. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
 
@@ -148,10 +148,10 @@ done
 `btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` (Mac drives) and `zpool` (ZFS) only
 matter if you installed those options.
 
-## Step 5: Use it with Xnix USB Mounter
+## Step 5: Use it with Linux USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `LinuxUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **openSUSE-Leap-16.0**. To make it the default for
    everything, run `wsl --set-default openSUSE-Leap-16.0` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -160,7 +160,7 @@ matter if you installed those options.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\XnixUsbMounter --list`.
+`.\LinuxUsbMounter --list`.
 
 ## Troubleshooting
 

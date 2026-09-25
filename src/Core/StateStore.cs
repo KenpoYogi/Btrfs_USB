@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -14,7 +14,7 @@ using System.Linq;
 using System.Runtime.Serialization.Json;
 using System.Text;
 
-namespace XnixUsbMounter.Core
+namespace LinuxUsbMounter.Core
 {
     /// <summary>
     /// Thread-safe owner of <see cref="AppState"/>. Readers get copies; writers go through the

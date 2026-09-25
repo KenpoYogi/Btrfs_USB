@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 
-namespace XnixUsbMounter.Core
+namespace LinuxUsbMounter.Core
 {
     // ---------------------------------------------------------------------------------------
     //  Persisted state (state.json) - member names match the PowerShell version's file

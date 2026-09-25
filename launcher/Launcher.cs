@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -12,12 +12,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
 
-namespace XnixUsbMounter.Launcher
+namespace LinuxUsbMounter.Launcher
 {
     /// <summary>
-    /// XnixUsbMounter.com: console front end for XnixUsbMounter.exe.
+    /// LinuxUsbMounter.com: console front end for LinuxUsbMounter.exe.
     /// The exe is a GUI program, so cmd.exe and PowerShell don't wait for it: its output lands after
-    /// the next prompt and %ERRORLEVEL% / $LASTEXITCODE are wrong. Typing "XnixUsbMounter" without an
+    /// the next prompt and %ERRORLEVEL% / $LASTEXITCODE are wrong. Typing "LinuxUsbMounter" without an
     /// extension picks this .com first (PATHEXT order). It runs the exe in this console, waits, and
     /// returns the exe's exit code. Without command-line switches it just opens the window.
     /// </summary>
@@ -25,10 +25,10 @@ namespace XnixUsbMounter.Launcher
     {
         private static int Main(string[] args)
         {
-            string exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XnixUsbMounter.exe");
+            string exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LinuxUsbMounter.exe");
             if (!File.Exists(exe))
             {
-                Console.Error.WriteLine("XnixUsbMounter.exe not found next to this launcher: " + exe);
+                Console.Error.WriteLine("LinuxUsbMounter.exe not found next to this launcher: " + exe);
                 return 1;
             }
 
@@ -57,7 +57,7 @@ namespace XnixUsbMounter.Launcher
             {
                 Console.Error.WriteLine(ex.NativeErrorCode == 1223
                     ? "Cancelled: administrator rights are required."
-                    : "Could not start XnixUsbMounter.exe: " + ex.Message);
+                    : "Could not start LinuxUsbMounter.exe: " + ex.Message);
                 return 1;
             }
 

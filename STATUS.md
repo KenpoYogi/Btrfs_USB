@@ -1,4 +1,4 @@
-# Xnix USB Mounter — where we are (status trail)
+# Linux USB Mounter — where we are (status trail)
 
 > **▶ THE LIVE "START HERE" RESUME IS [RESUME.md](RESUME.md)** (small, rewritten each change). This file is the
 > **append-only trail**: one entry per commit (or per uncommitted change, until it is committed), newest first, each
@@ -8,7 +8,19 @@
 
 ---
 
-## ⭐ (this commit) — **REISERFS AND REISER4 REMOVED FROM ALL USER DOCUMENTATION.** _2026-09-25. Evidence: user request ("Since Reiser4 and ReiserFS cannot be mounted, remove all mention of them from all documentation"). `dotnet build -c Release`: 0 warnings, 0 errors. `git grep -i reiser` outside the status docs and CLAUDE.md: only src/Core/FileSystems.cs and tools/build-wsl-modules.sh (code). Not run in the GUI._
+## ⭐ (this commit) — **RENAMED AGAIN: XNIX USB MOUNTER → LINUX USB MOUNTER, OUTPUT FILES LinuxUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("from XnixUsbMounter to LinuxUsbMounter to be a bit more descriptive ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
+et48 has LinuxUsbMounter.exe / .exe.config / .com / .pdb, ProductName "Linux USB Mounter", OriginalFilename LinuxUsbMounter.exe. `git grep -i xnix` outside the status docs: only the README upgrade note and CLAUDE.md "Name". Not run (elevated GUI)._
+
+- **Renamed** everything `29f15c5` renamed: `XnixUsbMounter.csproj` → `LinuxUsbMounter.csproj` (git mv), assembly, namespaces,
+  display name, file headers, LICENSE, app.manifest, launcher, .vscode, build script comments, README, distro guides, CLAUDE.md.
+- **Still the old BtrfsUsbMounter name on purpose** (unchanged): data folder, mutex / ack event / ShowWindow message,
+  logon task, the `.ps1` check. Nothing kept the Xnix name.
+- README upgrade section now covers `BtrfsUsbMounter.*` and `XnixUsbMounter.*`. STATUS.md history left as written, title only.
+- **Files.** all of the above, `RESUME.md`, this file.
+
+---
+
+## `159c44d` — **REISERFS AND REISER4 REMOVED FROM ALL USER DOCUMENTATION.** _2026-09-25. Evidence: user request ("Since Reiser4 and ReiserFS cannot be mounted, remove all mention of them from all documentation"). `dotnet build -c Release`: 0 warnings, 0 errors. `git grep -i reiser` outside the status docs and CLAUDE.md: only src/Core/FileSystems.cs and tools/build-wsl-modules.sh (code). Not run in the GUI._
 
 - **README:** both table rows, the "(before Linux 6.13) ReiserFS" in the build steps, "Reiser" in the file list.
 - **docs/distros:** the ReiserFS / Reiser4 row in all 9 guides, the paragraph in docs/distros/README.md.

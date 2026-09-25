@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -18,9 +18,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using XnixUsbMounter.Core;
+using LinuxUsbMounter.Core;
 
-namespace XnixUsbMounter.UI
+namespace LinuxUsbMounter.UI
 {
     internal sealed class MainForm : Form, IDriveActions
     {

@@ -1,10 +1,10 @@
-# Xnix USB Mounter (C# / .NET Framework 4.8)
+# Linux USB Mounter (C# / .NET Framework 4.8)
 
 A compiled port of the PowerShell tool: mount Linux- and Mac-formatted USB drives on Windows through
 WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline checks for btrfs.
 
 - .NET Framework 4.8, C# 7.3, WinForms, **no NuGet packages**
-- `XnixUsbMounter.exe` (plus its `.exe.config`) and a small console front end `XnixUsbMounter.com`;
+- `LinuxUsbMounter.exe` (plus its `.exe.config`) and a small console front end `LinuxUsbMounter.com`;
   .NET 4.8 ships with Windows 11
 - Uses the same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version, so
   settings and mount state carry over
@@ -36,8 +36,8 @@ Open the folder in VS Code and press **Ctrl+Shift+B** (default task: Debug build
 dotnet build -c Release
 ```
 
-Output in `bin\Release\net48\`: `XnixUsbMounter.exe`, `XnixUsbMounter.exe.config` and
-`XnixUsbMounter.com` (the console front end, built from `launcher\Launcher.cs` by the same build).
+Output in `bin\Release\net48\`: `LinuxUsbMounter.exe`, `LinuxUsbMounter.exe.config` and
+`LinuxUsbMounter.com` (the console front end, built from `launcher\Launcher.cs` by the same build).
 
 Other tasks (**Terminal > Run Task**): *build release*, *clean*, *run release (elevated)*.
 
@@ -51,12 +51,12 @@ programs uses the `clr` debugger of the C# extension (Windows only).
 ## Install / migrate from the PowerShell version
 
 1. Exit the PowerShell tool (tray icon > Exit).
-2. Copy everything in `bin\Release\net48\` to a permanent folder, e.g. `C:\Tools\XnixUsbMounter\`:
-   `XnixUsbMounter.exe`, `XnixUsbMounter.exe.config`, `XnixUsbMounter.com`, `LICENSE` **and the
+2. Copy everything in `bin\Release\net48\` to a permanent folder, e.g. `C:\Tools\LinuxUsbMounter\`:
+   `LinuxUsbMounter.exe`, `LinuxUsbMounter.exe.config`, `LinuxUsbMounter.com`, `LICENSE` **and the
    `tools\` folder** (with `build-wsl-modules.sh` inside), keeping the same layout. Without `tools\`,
    **Tools > Build filesystem drivers** fails with *The driver build script is missing*; without
    `LICENSE`, **About and license** falls back to the web page. (The `.pdb` file is optional.)
-3. Start `XnixUsbMounter.exe`. On first start it:
+3. Start `LinuxUsbMounter.exe`. On first start it:
    - reads your existing settings and mounted drives,
    - notices that the "start at logon" task still points at the PowerShell script and
      re-points it to the new program automatically.
@@ -65,11 +65,11 @@ programs uses the `clr` debugger of the C# extension (Windows only).
 
 If you move the `.exe` later, untick and re-tick **Start in tray at logon** from the new location.
 
-### Upgrading from BtrfsUsbMounter.exe
+### Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe
 
-The program used to be called Btrfs USB Mounter (`BtrfsUsbMounter.exe` / `.com`). To upgrade, exit the old
-copy (tray icon > Exit), copy the new files in, delete `BtrfsUsbMounter.exe`, `BtrfsUsbMounter.exe.config`
-and `BtrfsUsbMounter.com`, and start `XnixUsbMounter.exe`. Nothing else changes: settings, mount state and
+The program used to be called Btrfs USB Mounter (`BtrfsUsbMounter.exe` / `.com`), and briefly Xnix USB Mounter
+(`XnixUsbMounter.exe` / `.com`). To upgrade, exit the old copy (tray icon > Exit), copy the new files in, delete
+the old `.exe`, `.exe.config` and `.com` files, and start `LinuxUsbMounter.exe`. Nothing else changes: settings, mount state and
 the log stay in `%LOCALAPPDATA%\BtrfsUsbMounter`, the **start at logon** task (still named `BtrfsUsbMounter`
 in Task Scheduler) is re-pointed to the new program on its first start, and an old copy that is still
 running is detected as usual.
@@ -171,21 +171,21 @@ APFS volume names are logged when the drive is mounted.
 
 ## Command line
 
-Type the name **without** `.exe`, so the console front end `XnixUsbMounter.com` runs. The terminal
+Type the name **without** `.exe`, so the console front end `LinuxUsbMounter.com` runs. The terminal
 then waits: output appears in order and `%ERRORLEVEL%` / `$LASTEXITCODE` hold the real exit code.
 The `.exe` is a GUI program, and terminals don't wait for those.
 
 ```text
-XnixUsbMounter                     open the window
-XnixUsbMounter --tray              start hidden in the tray (used by the logon task)
-XnixUsbMounter --list              list detected filesystems and whether they can be mounted
-XnixUsbMounter --mount-all [--distro NAME] [--options compress=zstd]
-XnixUsbMounter --unmount-all
-XnixUsbMounter --help
-XnixUsbMounter --list --verbose    also print the troubleshooting detail (see Logging below)
+LinuxUsbMounter                     open the window
+LinuxUsbMounter --tray              start hidden in the tray (used by the logon task)
+LinuxUsbMounter --list              list detected filesystems and whether they can be mounted
+LinuxUsbMounter --mount-all [--distro NAME] [--options compress=zstd]
+LinuxUsbMounter --unmount-all
+LinuxUsbMounter --help
+LinuxUsbMounter --list --verbose    also print the troubleshooting detail (see Logging below)
 ```
 
-In PowerShell, from the program folder, prefix it with `.\` (for example `.\XnixUsbMounter --list`).
+In PowerShell, from the program folder, prefix it with `.\` (for example `.\LinuxUsbMounter --list`).
 
 Run from an **administrator** terminal to see the output there. From a normal terminal, Windows asks
 for administrator rights and the output opens in its own console window, which waits for Enter.
@@ -210,7 +210,7 @@ read-only offline check with saved reports, tools installer, and no repair butto
 ## Project layout
 
 ```text
-XnixUsbMounter.csproj      SDK-style project, net48, C# 7.3
+LinuxUsbMounter.csproj      SDK-style project, net48, C# 7.3
 app.manifest                requireAdministrator, Windows 10/11 compatibility
 App.config                  per-monitor DPI awareness
 assets/app.ico              application and tray icon
@@ -228,7 +228,7 @@ src/Core/Services.cs        maintenance (scrub, check, tools), logon task, job q
 src/UI/UiKit.cs             shared controls (usage bar, flicker-free list)
 src/UI/MainForm.cs          main window and tray
 src/UI/DriveInfoForm.cs     drive info window
-launcher/Launcher.cs        console front end, compiled to XnixUsbMounter.com
+launcher/Launcher.cs        console front end, compiled to LinuxUsbMounter.com
 ```
 
 ## Logging
@@ -281,5 +281,5 @@ which open-source licenses may not do.
 | Nothing happens on start | Another copy is running hidden; the new launch offers to end it after 2 s |
 | Drive not listed | Tick *Include non-USB disks* (some enclosures report as SCSI), click Refresh |
 | Mount fails | The log shows the error, a hint and, if relevant, the kernel messages |
-| "The driver build script is missing" | Copy the `tools\` folder from `bin\Release\net48\` next to `XnixUsbMounter.exe` |
+| "The driver build script is missing" | Copy the `tools\` folder from `bin\Release\net48\` next to `LinuxUsbMounter.exe` |
 | Logs | `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` (see Logging above); check reports in the `checks` subfolder |

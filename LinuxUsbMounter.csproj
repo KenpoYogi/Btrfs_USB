@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Xnix USB Mounter - .NET Framework 4.8 / C# 7.3 / WinForms, no NuGet packages.
+    Linux USB Mounter - .NET Framework 4.8 / C# 7.3 / WinForms, no NuGet packages.
     Build:  dotnet build -c Release      (needs the .NET SDK + .NET Framework 4.8 Developer Pack)
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>7.3</LangVersion>
-    <RootNamespace>XnixUsbMounter</RootNamespace>
-    <AssemblyName>XnixUsbMounter</AssemblyName>
+    <RootNamespace>LinuxUsbMounter</RootNamespace>
+    <AssemblyName>LinuxUsbMounter</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -20,7 +20,7 @@
     <WarningLevel>4</WarningLevel>
 
     <Version>2.0.0</Version>
-    <Product>Xnix USB Mounter</Product>
+    <Product>Linux USB Mounter</Product>
     <Description>Mount Linux and Mac formatted USB drives on Windows through WSL2</Description>
     <Company>Jay Weiner</Company>
     <Copyright>Copyright (c) 2026 Jay Weiner. MIT License with the Commons Clause: selling is not permitted.</Copyright>
@@ -38,7 +38,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- compiled separately into XnixUsbMounter.com, see the target below -->
+    <!-- compiled separately into LinuxUsbMounter.com, see the target below -->
     <Compile Remove="launcher\**" />
     <None Include="launcher\**" />
   </ItemGroup>
@@ -53,7 +53,7 @@
   </ItemGroup>
 
   <!--
-    XnixUsbMounter.com: small console front end (launcher\Launcher.cs). Terminals wait for a console
+    LinuxUsbMounter.com: small console front end (launcher\Launcher.cs). Terminals wait for a console
     program, so command-line output prints in order and the exit code is real. Typing the name
     without an extension picks the .com before the .exe.
   -->

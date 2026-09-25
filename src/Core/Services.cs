@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -20,7 +20,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace XnixUsbMounter.Core
+namespace LinuxUsbMounter.Core
 {
     // ---------------------------------------------------------------------------------------
     //  btrfs maintenance (runs inside WSL as root; needs btrfs-progs in the distro)
@@ -301,7 +301,7 @@ namespace XnixUsbMounter.Core
             string xml =
                 "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" +
                 "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\r\n" +
-                "  <RegistrationInfo><Description>Xnix USB Mounter (tray)</Description></RegistrationInfo>\r\n" +
+                "  <RegistrationInfo><Description>Linux USB Mounter (tray)</Description></RegistrationInfo>\r\n" +
                 "  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>" + SecurityElement.Escape(user) + "</UserId></LogonTrigger></Triggers>\r\n" +
                 "  <Principals><Principal id=\"Author\"><UserId>" + SecurityElement.Escape(user) + "</UserId>" +
                 "<LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals>\r\n" +
@@ -324,7 +324,7 @@ namespace XnixUsbMounter.Core
                 "  <Actions Context=\"Author\"><Exec><Command>" + SecurityElement.Escape(AppPaths.ExePath) + "</Command>" +
                 "<Arguments>--tray</Arguments></Exec></Actions>\r\n" +
                 "</Task>\r\n";
-            string temp = Path.Combine(Path.GetTempPath(), "XnixUsbMounter-task.xml");
+            string temp = Path.Combine(Path.GetTempPath(), "LinuxUsbMounter-task.xml");
             File.WriteAllText(temp, xml, Encoding.Unicode);
             try
             {

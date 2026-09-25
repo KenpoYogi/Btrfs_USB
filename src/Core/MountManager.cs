@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -16,7 +16,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace XnixUsbMounter.Core
+namespace LinuxUsbMounter.Core
 {
     /// <summary>Mounting, ejecting, keep-alive and reconciliation of saved state with WSL.</summary>
     public sealed class MountManager

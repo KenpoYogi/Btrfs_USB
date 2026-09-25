@@ -1,4 +1,4 @@
-# Xnix USB Mounter - project context
+# Linux USB Mounter - project context
 
 Standalone Windows desktop tool (NOT a Cimatron plugin; no Cimatron/ACIS references).
 Mounts Linux/Mac-formatted USB drives through WSL2 (`wsl --mount --type <fs>`): btrfs, ext2/3/4 and
@@ -23,14 +23,15 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - AnyCPU, Prefer32Bit=false (a 32-bit process would be redirected away from the real wsl.exe)
 
 ## Commands
-- Build: `dotnet build -c Release` -> `bin\Release\net48\XnixUsbMounter.exe` (+ `.exe.config`, `.com`)
-- CLI check without the GUI: `XnixUsbMounter --list` (elevated terminal; no extension, so the `.com` runs);
+- Build: `dotnet build -c Release` -> `bin\Release\net48\LinuxUsbMounter.exe` (+ `.exe.config`, `.com`)
+- CLI check without the GUI: `LinuxUsbMounter --list` (elevated terminal; no extension, so the `.com` runs);
   add `--verbose` to see the DEBUG lines too
 - Logs: `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log`; state: `state.json` in the same folder
 
 ## Name
-- Renamed Btrfs USB Mounter / BtrfsUsbMounter -> Xnix USB Mounter / XnixUsbMounter (2026-09-25): project
-  XnixUsbMounter.csproj, assembly and namespaces XnixUsbMounter, output XnixUsbMounter.exe / .com. Repo folder is
+- Renamed Btrfs USB Mounter / BtrfsUsbMounter -> Linux USB Mounter / LinuxUsbMounter (2026-09-25; briefly
+  XnixUsbMounter in 29f15c5 and 159c44d): project LinuxUsbMounter.csproj, assembly and namespaces LinuxUsbMounter,
+  output LinuxUsbMounter.exe / .com. Nothing kept the Xnix name (it never had its own data folder or task). Repo folder is
   still Btrfs_USB. Deliberately KEPT the old name (compatibility with older copies, do not rename): the data
   folder `%LOCALAPPDATA%\BtrfsUsbMounter`, mutex / ack event / ShowWindow message `BtrfsUsbMounter.*`, the logon
   task name `BtrfsUsbMounter` (PointsElsewhere re-points it), the `BtrfsUsbMounter.ps1` check for the PowerShell version
@@ -156,7 +157,7 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 ## Rules learned the hard way (keep these)
 - No double hyphen inside XML comments (app.manifest, csproj, App.config): the Windows loader
   rejects the manifest and the exe fails with a side-by-side configuration error
-- The exe is WinExe, so terminals don't wait for it. CLI use goes through `XnixUsbMounter.com`
+- The exe is WinExe, so terminals don't wait for it. CLI use goes through `LinuxUsbMounter.com`
   (`launcher/Launcher.cs`, compiled by the `BuildConsoleLauncher` target), which runs the exe in
   its console and relays the exit code
 - Never block the UI thread: all wsl.exe, WMI and raw disk I/O go through JobQueue

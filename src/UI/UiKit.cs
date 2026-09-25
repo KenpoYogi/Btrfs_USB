@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -10,13 +10,13 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using XnixUsbMounter.Core;
+using LinuxUsbMounter.Core;
 
-namespace XnixUsbMounter.UI
+namespace LinuxUsbMounter.UI
 {
     internal static class UiKit
     {
-        public const string AppName = "Xnix USB Mounter";
+        public const string AppName = "Linux USB Mounter";
 
         public static readonly Font BaseFont = new Font("Segoe UI", 9f);
         public static readonly Font BoldFont = new Font("Segoe UI", 9f, FontStyle.Bold);

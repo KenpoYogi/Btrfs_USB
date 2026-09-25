@@ -1,4 +1,4 @@
-// Xnix USB Mounter
+// Linux USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -15,7 +15,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace XnixUsbMounter.Core
+namespace LinuxUsbMounter.Core
 {
     // ---------------------------------------------------------------------------------------
     //  Filesystem kinds and how each one gets mounted

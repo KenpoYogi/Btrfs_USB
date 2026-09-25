@@ -1,6 +1,6 @@
-# Xnix USB Mounter with openSUSE Tumbleweed
+# Linux USB Mounter with openSUSE Tumbleweed
 
-**Recommended.** Tumbleweed is the distro Xnix USB Mounter is developed and tested on, and the only
+**Recommended.** Tumbleweed is the distro Linux USB Mounter is developed and tested on, and the only
 one where every feature works, including the extra drivers built by **Tools > Build filesystem drivers**.
 
 | What you want to open | Works on Tumbleweed? |
@@ -104,9 +104,9 @@ depends on them.
 
 ### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS read/write)
 
-The WSL kernel from Microsoft has no drivers for these, so Xnix USB Mounter compiles them for you:
+The WSL kernel from Microsoft has no drivers for these, so Linux USB Mounter compiles them for you:
 
-1. In Xnix USB Mounter choose **Tools > Build filesystem drivers**.
+1. In Linux USB Mounter choose **Tools > Build filesystem drivers**.
 2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in the distro. It
    downloads the WSL kernel source (about 250 MB), OpenZFS and linux-apfs-rw.
 3. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
@@ -134,10 +134,10 @@ done
 `btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` (APFS) and `zpool` (ZFS) only matter if
 you installed those options.
 
-## Step 5: Use it with Xnix USB Mounter
+## Step 5: Use it with Linux USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `LinuxUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **openSUSE-Tumbleweed**. To make it the default for
    everything, run `wsl --set-default openSUSE-Tumbleweed` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -146,7 +146,7 @@ you installed those options.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\XnixUsbMounter --list`.
+`.\LinuxUsbMounter --list`.
 
 ## Troubleshooting
 
@@ -157,7 +157,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`; ZFS: install `zfs` (Step 3). Then click **Refresh** |
 | Status says *No driver* | Run **Tools > Build filesystem drivers** (again, after a `wsl --update`) |
 | A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
-| "The driver build script is missing" | Copy the `tools\` folder next to `XnixUsbMounter.exe` |
+| "The driver build script is missing" | Copy the `tools\` folder next to `LinuxUsbMounter.exe` |
 | `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

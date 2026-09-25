@@ -1,5 +1,5 @@
 #!/bin/sh
-# Xnix USB Mounter
+# Linux USB Mounter
 # Copyright (c) 2026 Jay Weiner
 # SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 #
@@ -71,10 +71,10 @@ pin_kconfig() {
 #     left by an earlier FreeBSD mount over the changes made here (it only uses a journal whose time
 #     matches fs_mtime), and does a full check instead.
 # Only for the 4.4BSD flavours (ufstype=44bsd and ufs2); Solaris flavours are left alone. The module gets
-# modinfo field wsl_handoff=1, which Xnix USB Mounter requires before it mounts UFS read/write.
+# modinfo field wsl_handoff=1, which Linux USB Mounter requires before it mounts UFS read/write.
 ufs_handoff() {
     cat > "$1/wsl-handoff.h" <<'EOF'
-/* Added by tools/build-wsl-modules.sh (Xnix USB Mounter): see ufs_handoff there */
+/* Added by tools/build-wsl-modules.sh (Linux USB Mounter): see ufs_handoff there */
 #define WSL_FS_DOSOFTDEP	0x00000002
 #define WSL_FS_SUJ		0x00000008
 #define WSL_FS_FLAGS_UPDATED	0x80		/* in the old 8-bit flags: 32-bit fs_flags in use */
