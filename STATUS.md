@@ -8,7 +8,19 @@
 
 ---
 
-## ⭐ (this commit) — **RENAMED TO XNIX USB MOUNTER: OUTPUT FILES XnixUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("make the name of the output files from BtrfsUsbMounter to XnixUsbMounter ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
+## ⭐ (this commit) — **REISERFS AND REISER4 REMOVED FROM ALL USER DOCUMENTATION.** _2026-09-25. Evidence: user request ("Since Reiser4 and ReiserFS cannot be mounted, remove all mention of them from all documentation"). `dotnet build -c Release`: 0 warnings, 0 errors. `git grep -i reiser` outside the status docs and CLAUDE.md: only src/Core/FileSystems.cs and tools/build-wsl-modules.sh (code). Not run in the GUI._
+
+- **README:** both table rows, the "(before Linux 6.13) ReiserFS" in the build steps, "Reiser" in the file list.
+- **docs/distros:** the ReiserFS / Reiser4 row in all 9 guides, the paragraph in docs/distros/README.md.
+- **User-facing texts:** `--help` (`src/Program.cs`, now "... JFS, ZFS, HFS+, APFS, UFS/UFS2"), the Tools menu item and the
+  build confirmation dialog (`src/UI/MainForm.cs`).
+- **Unchanged (code):** the probe still detects both and explains why they can't be mounted; the build script still
+  builds reiserfs on pre-6.13 kernels. CLAUDE.md "Filesystems" records the decision.
+- **Files.** `README.md`, `docs/distros/*.md` (10), `src/Program.cs`, `src/UI/MainForm.cs`, `CLAUDE.md`, `RESUME.md`, this file.
+
+---
+
+## `29f15c5` — **RENAMED TO XNIX USB MOUNTER: OUTPUT FILES XnixUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("make the name of the output files from BtrfsUsbMounter to XnixUsbMounter ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
 et48 has XnixUsbMounter.exe / .exe.config / .com / .pdb, exe ProductName "Xnix USB Mounter", OriginalFilename XnixUsbMounter.exe. Not run (elevated GUI)._
 
 - **Renamed:** `BtrfsUsbMounter.csproj` → `XnixUsbMounter.csproj` (git mv), AssemblyName / RootNamespace / every namespace,

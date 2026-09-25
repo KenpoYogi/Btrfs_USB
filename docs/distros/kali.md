@@ -10,7 +10,6 @@ filesystems as openSUSE Tumbleweed. Kali is tested with the app, together with T
 | APFS (Mac drives) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow APFS writes** (experimental) |
 | JFS, HFS+ (Mac), ZFS | Yes, after **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-ufs-zfs-apfs)) |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
-| ReiserFS, Reiser4 | No (detected only) |
 
 **Don't install `libfsapfs-utils` on Kali.** Its `fsapfsmount` exists but only prints *"No sub system
 to mount APFS format"* (the Kali build has no FUSE support), and because the command is there the app

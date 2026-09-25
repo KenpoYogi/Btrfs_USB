@@ -88,12 +88,10 @@ Whether a filesystem can be mounted depends on the WSL kernel, and is checked at
 | ext2, ext3, ext4 | yes | read/write | `wsl --mount --type ext2/ext3/ext4` (built into the WSL kernel) |
 | XFS | yes | read/write | `wsl --mount --type xfs` (built into the WSL kernel) |
 | JFS | yes | read/write* | `wsl --mount --type jfs` with the locally built `jfs` module |
-| ReiserFS 3.x | yes | read/write* on WSL kernels before 6.13 | `wsl --mount --type reiserfs` with the locally built `reiserfs` module; Linux 6.13 removed ReiserFS, so on newer WSL kernels it is detect-only (the build skips it) |
 | HFS+ / HFSX | yes | read/write* | `wsl --mount --type hfsplus` with the locally built `hfsplus` module; journaled volumes mount read-only |
 | ZFS | yes | read/write* | `wsl --mount --bare`, then `zpool import -R /mnt/wsl` (locally built OpenZFS module + `zfs` package); eject = `zpool export` |
 | APFS | yes | read-only, or read/write* (experimental) | read-only: `fsapfsmount` (FUSE, package `libfsapfs`), all volumes; read/write: the locally built `linux-apfs-rw` driver after **Tools > Allow APFS writes**, first volume only; no FileVault |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | yes | read-only*, or read/write* (experimental) | `wsl --mount --type ufs --options ufstype=ufs2` (or `44bsd` for UFS1) with the locally built `ufs` module; read/write after **Tools > Allow UFS writes**. Solaris UFS, and drives not cleanly unmounted, stay read-only |
-| Reiser4 | yes | no | never in mainline Linux; its patches stop at Linux 5.16 |
 
 \* needs the drivers built for the running WSL kernel: **Tools > Build filesystem drivers**, or
 `sh tools/build-wsl-modules.sh` as root in the distro. It works in distros with zypper (openSUSE, SLES) or
@@ -102,8 +100,8 @@ these drivers, and the distros' own driver packages (`*-kmp-default`, `zfs-dkms`
 for the distro's kernel or need its headers, which WSL doesn't have. The script:
 
 1. downloads the WSL kernel source for `uname -r` from github.com/microsoft/WSL2-Linux-Kernel and
-   configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS, UFS (with write
-   support) and (before Linux 6.13) ReiserFS as modules
+   configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS and UFS (with write
+   support) as modules
 2. builds vmlinux once for symbol versions and checks them against Microsoft's own `btrfs.ko`
 3. builds the in-tree drivers, OpenZFS (same version as the installed `zfs` package) and linux-apfs-rw.
    UFS is built from a copy of `fs/ufs` with a small change that keeps FreeBSD's view of the
@@ -223,7 +221,7 @@ src/Core/Models.cs          persisted state, disks, volumes, btrfs results
 src/Core/StateStore.cs      thread-safe state.json (atomic writes)
 src/Core/Wsl.cs             async wsl.exe runner (timeouts, cancel, streaming), distros
 src/Core/Disks.cs           raw partition reader, cache, WMI Storage API enumeration
-src/Core/FileSystems.cs     filesystem signatures (btrfs, ext, XFS, JFS, Reiser, ZFS, HFS+, APFS, UFS), runtime support check
+src/Core/FileSystems.cs     filesystem signatures (btrfs, ext, XFS, JFS, ZFS, HFS+, APFS, UFS), runtime support check
 src/Core/BtrfsParsers.cs    btrfs usage / device stats / scrub status parsers
 src/Core/MountManager.cs    mount, flush-and-eject, keep-alive, state sync, scanner
 src/Core/Services.cs        maintenance (scrub, check, tools), logon task, job queue, engine

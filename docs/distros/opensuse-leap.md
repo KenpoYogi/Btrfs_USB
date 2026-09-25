@@ -11,7 +11,6 @@ and ZFS tools in openSUSE's *filesystems* repository. The driver build is only t
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental), after [Extra drivers](#extra-drivers) |
-| ReiserFS, Reiser4 | No (detected only) |
 
 WSL install name: **`openSUSE-Leap-16.0`**
 

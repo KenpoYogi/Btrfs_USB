@@ -23,9 +23,6 @@ on Leap, SLES, Debian and Ubuntu it is expected to work but not tested yet.
 | CentOS Stream / AlmaLinux | [centos.md](centos.md) | Yes (EPEL, except AlmaLinux 10) | No | No |
 | Arch Linux | [arch.md](arch.md) | Yes | No | No |
 
-ReiserFS and Reiser4 drives are detected on every distro but can't be opened: Linux 6.13 removed
-ReiserFS, and current WSL kernels are newer than that.
-
 UFS drives from FreeBSD, NetBSD and OpenBSD open wherever the extra drivers can be built: read-only,
 or read/write after **Tools > Allow UFS writes** (experimental; see the [README](../../README.md#ufs)).
 

@@ -8,7 +8,6 @@ btrfs tools are in Arch's core repository, so btrfs, ext and XFS drives work fin
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | No (`fsapfsmount` is not in Arch's repositories or the AUR) |
 | JFS, HFS+ (Mac), UFS (BSD), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
-| ReiserFS, Reiser4 | No (detected only) |
 
 **Tools > Build filesystem drivers** needs a distro with zypper or apt (openSUSE, SLES, Debian,
 Kali, Ubuntu). For Mac drives or the extra filesystems, install openSUSE Tumbleweed or Kali next to Arch

@@ -16,7 +16,6 @@ SLES is SUSE's commercial distro. It works well for btrfs, ext and XFS drives. T
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` from SUSE Package Hub (needs registration) |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental), after [Extra drivers](#extra-drivers) |
-| ReiserFS, Reiser4 | No (detected only) |
 
 WSL install names: **`SUSE-Linux-Enterprise-16.0`** or **`SUSE-Linux-Enterprise-15-SP7`**
 

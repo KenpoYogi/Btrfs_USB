@@ -9,8 +9,6 @@ one where every feature works, including the extra drivers built by **Tools > Bu
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Yes, after **Tools > Build filesystem drivers** |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
-| ReiserFS | Only on WSL kernels older than 6.13 (Linux 6.13 removed it) |
-| Reiser4 | No (detected only) |
 
 WSL install name: **`openSUSE-Tumbleweed`**
 

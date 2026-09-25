@@ -52,6 +52,9 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   PowerShell version), show-window broadcast + ack event, CLI mode
 
 ## Filesystems
+- User docs (README, docs/distros, --help, menu and dialog texts) do NOT mention ReiserFS or Reiser4 (user decision
+  2026-09-25: they cannot be mounted on current WSL kernels). The probe, its "can't mount" notes and the build script's
+  pre-6.13 reiserfs path stay in the code; don't add them back to the docs
 - `src/Core/FileSystems.cs`: `FsProbe` parses one cached 272 KiB read per partition (priority order,
   btrfs crc32c checked, libblkid-style sanity checks for ReiserFS and ZFS); `FsSupport` asks the
   distro at runtime which kinds the kernel has (`/proc/filesystems`, `modinfo`) and if fsapfsmount/zpool exist

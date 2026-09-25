@@ -17,7 +17,6 @@ Ubuntu is the most common WSL distro and a good choice for btrfs, ext and XFS dr
 | JFS, HFS+ (Mac), APFS read/write | Should work, not tested (see below) | Should work, not tested |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental) | Should work, not tested |
 | ZFS | No: Ubuntu's ZFS 2.2.2 is too old for the WSL kernel | Should work, not tested |
-| ReiserFS, Reiser4 | No (detected only) | No |
 
 **Extra drivers.** **Tools > Build filesystem drivers** compiles JFS, HFS+, UFS, ZFS and APFS drivers for
 the WSL kernel with apt and Ubuntu's `gcc-13`. It is tested on Kali (Debian-based, same apt route),

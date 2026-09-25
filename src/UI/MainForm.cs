@@ -249,7 +249,7 @@ namespace XnixUsbMounter.UI
             miDebugLog = new ToolStripMenuItem("Show detailed log lines") { CheckOnClick = true };
             miOpenLog = new ToolStripMenuItem("Open log file");
             miAbout = new ToolStripMenuItem("About and license...");
-            miBuildDrivers = new ToolStripMenuItem("Build filesystem drivers (JFS, ReiserFS, HFS+, UFS, ZFS, APFS)...");
+            miBuildDrivers = new ToolStripMenuItem("Build filesystem drivers (JFS, HFS+, UFS, ZFS, APFS)...");
             miApfsWrite = new ToolStripMenuItem("Allow APFS writes (experimental)") { Checked = settings.ApfsWrite };
             miUfsWrite = new ToolStripMenuItem("Allow UFS writes (experimental)") { Checked = settings.UfsWrite };
             toolsMenu.Items.AddRange(new ToolStripItem[]
@@ -543,7 +543,7 @@ namespace XnixUsbMounter.UI
                 return;
             }
             DialogResult answer = UiKit.Show(this,
-                "Build the JFS, ReiserFS (kernels before 6.13 only), HFS+, UFS, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
+                "Build the JFS, HFS+, UFS, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
                 "This installs compilers in the distro (zypper on openSUSE and SLES, apt on Debian, Kali and Ubuntu), downloads the WSL kernel source (about 250 MB), " +
                 "OpenZFS and linux-apfs-rw, and compiles them. The first run takes 15-40 minutes; later runs are quicker. " +
                 "Other tasks wait until it finishes. Rerun it after every \"wsl --update\".\r\n\r\n" +

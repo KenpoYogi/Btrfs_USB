@@ -9,7 +9,6 @@ Debian is a stable, conservative distro. It handles btrfs, ext and XFS drives, a
 | APFS (Mac drives), read-only | Yes, with `libfsapfs-utils` (not on Debian testing/unstable, see below) |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: **Tools > Build filesystem drivers** (tested on Kali, which is Debian-based) |
 | UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: after **Tools > Build filesystem drivers**, read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
-| ReiserFS, Reiser4 | No (detected only) |
 
 **ZFS and APFS driver packages.** Debian has them (checked September 2026; trixie: ZFS 2.3.9 in
 *contrib*, 2.4.4 in backports, APFS 0.3.13): `zfs-dkms` and `zfsutils-linux` for ZFS, and `apfs-dkms`
