@@ -1,4 +1,4 @@
-# Btrfs USB Mounter with Arch Linux
+# Xnix USB Mounter with Arch Linux
 
 Arch is a rolling-release distro that ships only a small base system: you add what you need. The
 btrfs tools are in Arch's core repository, so btrfs, ext and XFS drives work fine.
@@ -59,7 +59,7 @@ wsl --install -d archlinux
 
 Unlike most distros, Arch **doesn't ask for a user name**: it starts you as `root` (the Linux
 administrator). On the first start it sets up the package signing keys by itself. `sudo` is not
-installed. That's fine for Btrfs USB Mounter, which always works as root.
+installed. That's fine for Xnix USB Mounter, which always works as root.
 
 Check that it runs as WSL **2**:
 
@@ -120,10 +120,10 @@ done
 
 All three must say **OK**.
 
-## Step 5: Use it with Btrfs USB Mounter
+## Step 5: Use it with Xnix USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `BtrfsUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **archlinux**. To make it the default for everything,
    run `wsl --set-default archlinux` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -132,7 +132,7 @@ All three must say **OK**.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\BtrfsUsbMounter --list`.
+`.\XnixUsbMounter --list`.
 
 ## Troubleshooting
 

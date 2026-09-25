@@ -1,4 +1,4 @@
-# Btrfs USB Mounter with Fedora
+# Xnix USB Mounter with Fedora
 
 Fedora uses btrfs itself, so btrfs drives are well supported. Fedora has no package with the
 `fsapfsmount` tool, so Mac (APFS) drives don't work here.
@@ -13,7 +13,7 @@ Fedora uses btrfs itself, so btrfs drives are well supported. Fedora has no pack
 **Tools > Build filesystem drivers** needs a distro with zypper or apt (openSUSE, SLES, Debian,
 Kali, Ubuntu). For Mac drives or the extra filesystems, install openSUSE Tumbleweed or Kali next to Fedora
 and pick it in the app. Fedora's `apfs-fuse` package is a different
-tool that Btrfs USB Mounter does not use.
+tool that Xnix USB Mounter does not use.
 
 WSL install names: **`FedoraLinux-44`** (used below) or **`FedoraLinux-43`**
 
@@ -104,10 +104,10 @@ done
 
 All three must say **OK**.
 
-## Step 5: Use it with Btrfs USB Mounter
+## Step 5: Use it with Xnix USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `BtrfsUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **FedoraLinux-44**. To make it the default for
    everything, run `wsl --set-default FedoraLinux-44` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -116,7 +116,7 @@ All three must say **OK**.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\BtrfsUsbMounter --list`.
+`.\XnixUsbMounter --list`.
 
 ## Troubleshooting
 

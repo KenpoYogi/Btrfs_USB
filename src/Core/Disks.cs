@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -17,7 +17,7 @@ using System.Management;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     internal static class Kernel32
     {

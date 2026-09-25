@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     /// <summary>
     /// Parsers for btrfs-progs output. Labels were checked against the format strings compiled into

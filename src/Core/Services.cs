@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -20,7 +20,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     // ---------------------------------------------------------------------------------------
     //  btrfs maintenance (runs inside WSL as root; needs btrfs-progs in the distro)
@@ -242,6 +242,8 @@ namespace BtrfsUsbMounter.Core
     // ---------------------------------------------------------------------------------------
     public static class StartupTask
     {
+        // the pre-rename task name on purpose: an existing task that still starts BtrfsUsbMounter.exe is found
+        // and re-pointed at this program (PointsElsewhere), instead of both starting at logon
         public const string TaskName = "BtrfsUsbMounter";
 
         private static int RunSchtasks(string arguments, out string output)
@@ -299,7 +301,7 @@ namespace BtrfsUsbMounter.Core
             string xml =
                 "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" +
                 "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\r\n" +
-                "  <RegistrationInfo><Description>Btrfs USB Mounter (tray)</Description></RegistrationInfo>\r\n" +
+                "  <RegistrationInfo><Description>Xnix USB Mounter (tray)</Description></RegistrationInfo>\r\n" +
                 "  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>" + SecurityElement.Escape(user) + "</UserId></LogonTrigger></Triggers>\r\n" +
                 "  <Principals><Principal id=\"Author\"><UserId>" + SecurityElement.Escape(user) + "</UserId>" +
                 "<LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals>\r\n" +
@@ -322,7 +324,7 @@ namespace BtrfsUsbMounter.Core
                 "  <Actions Context=\"Author\"><Exec><Command>" + SecurityElement.Escape(AppPaths.ExePath) + "</Command>" +
                 "<Arguments>--tray</Arguments></Exec></Actions>\r\n" +
                 "</Task>\r\n";
-            string temp = Path.Combine(Path.GetTempPath(), "BtrfsUsbMounter-task.xml");
+            string temp = Path.Combine(Path.GetTempPath(), "XnixUsbMounter-task.xml");
             File.WriteAllText(temp, xml, Encoding.Unicode);
             try
             {

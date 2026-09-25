@@ -1,4 +1,4 @@
-# Btrfs USB Mounter — where we are (status trail)
+# Xnix USB Mounter — where we are (status trail)
 
 > **▶ THE LIVE "START HERE" RESUME IS [RESUME.md](RESUME.md)** (small, rewritten each change). This file is the
 > **append-only trail**: one entry per commit (or per uncommitted change, until it is committed), newest first, each
@@ -8,7 +8,22 @@
 
 ---
 
-## ⭐ (this commit) — **EMPTY DRIVE LIST TEXT: REISERFS AND REISER4 REMOVED, "UFS" → "UFS/UFS2".** _2026-09-25. Evidence: user request ("In the dialogue background remove the words ReiserFS and Reiser4 please. Also change UFS to UFS/UFS2"). `dotnet build -c Release`: 0 errors. Not run in the GUI._
+## ⭐ (this commit) — **RENAMED TO XNIX USB MOUNTER: OUTPUT FILES XnixUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("make the name of the output files from BtrfsUsbMounter to XnixUsbMounter ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
+et48 has XnixUsbMounter.exe / .exe.config / .com / .pdb, exe ProductName "Xnix USB Mounter", OriginalFilename XnixUsbMounter.exe. Not run (elevated GUI)._
+
+- **Renamed:** `BtrfsUsbMounter.csproj` → `XnixUsbMounter.csproj` (git mv), AssemblyName / RootNamespace / every namespace,
+  Product and every "Btrfs USB Mounter" display string (window title, --help, log start line, task description, SPDX
+  headers, LICENSE "Software:" line, build script comments), app.manifest identity, launcher target exe, .vscode tasks.
+- **Kept on purpose** (older copies must still see the new one): `%LOCALAPPDATA%\BtrfsUsbMounter` (state + log carry
+  over), mutex / ack event / ShowWindow message `BtrfsUsbMounter.*`, logon task name `BtrfsUsbMounter` (re-pointed to the
+  new exe by `PointsElsewhere`), the `BtrfsUsbMounter.ps1` check. Commented in code; listed in CLAUDE.md "Name".
+- **Docs:** README (names, install folder, new "Upgrading from BtrfsUsbMounter.exe"), all distro guides, CLAUDE.md.
+  STATUS.md history left as written (append-only), title only.
+- **Files.** all of the above, `RESUME.md`, this file.
+
+---
+
+## `a874ec1` — **EMPTY DRIVE LIST TEXT: REISERFS AND REISER4 REMOVED, "UFS" → "UFS/UFS2".** _2026-09-25. Evidence: user request ("In the dialogue background remove the words ReiserFS and Reiser4 please. Also change UFS to UFS/UFS2"). `dotnet build -c Release`: 0 errors. Not run in the GUI._
 
 - `MainForm.emptyLabel` now reads "...btrfs, ext2/3/4, XFS, JFS, ZFS, HFS+, APFS or UFS/UFS2 - it will appear here
   automatically." Detection unchanged. `--help` (`src/Program.cs`) still lists ReiserFS and Reiser4 (asked the user).

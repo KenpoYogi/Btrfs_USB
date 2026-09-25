@@ -1,4 +1,4 @@
-# Btrfs USB Mounter with Debian
+# Xnix USB Mounter with Debian
 
 Debian is a stable, conservative distro. It handles btrfs, ext and XFS drives, and on Debian 13
 ("trixie", the current stable release) also Mac (APFS) drives, read-only.
@@ -115,7 +115,7 @@ have Debian 12 ("bookworm"), `libfsapfs-utils` is not verified with this app.
 
 ### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS)
 
-The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them with
+The WSL kernel from Microsoft has no drivers for these, so Xnix USB Mounter compiles them with
 Debian's `gcc-13` and the WSL kernel's source code. **Tested on Kali, not yet on Debian itself.**
 
 1. **For ZFS only: turn on *contrib*** (the ZFS tools live there). Add `contrib` after `main` in the
@@ -130,7 +130,7 @@ Debian's `gcc-13` and the WSL kernel's source code. **Tested on Kali, not yet on
    apt update
    ```
 
-2. In Btrfs USB Mounter pick **Debian** in the **WSL2 distro** box, then choose **Tools > Build
+2. In Xnix USB Mounter pick **Debian** in the **WSL2 distro** box, then choose **Tools > Build
    filesystem drivers**.
 3. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in the distro.
 4. The log ends with *Filesystem drivers built and installed for this WSL kernel.*
@@ -158,10 +158,10 @@ done
 `btrfs`, `blkid` and `modinfo` must say **OK**. `fsapfsmount` (Mac drives) and `zpool` (ZFS, after
 the driver build) only matter if you use those.
 
-## Step 5: Use it with Btrfs USB Mounter
+## Step 5: Use it with Xnix USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `BtrfsUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **Debian**. To make it the default for everything,
    run `wsl --set-default Debian` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -170,7 +170,7 @@ the driver build) only matter if you use those.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\BtrfsUsbMounter --list`.
+`.\XnixUsbMounter --list`.
 
 ## Troubleshooting
 

@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -16,10 +16,10 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using BtrfsUsbMounter.Core;
-using BtrfsUsbMounter.UI;
+using XnixUsbMounter.Core;
+using XnixUsbMounter.UI;
 
-namespace BtrfsUsbMounter
+namespace XnixUsbMounter
 {
     internal static class Program
     {
@@ -96,7 +96,8 @@ namespace BtrfsUsbMounter
     /// </summary>
     internal static class SingleInstance
     {
-        // same name as the PowerShell version, so the two can never run side by side
+        // same name as the PowerShell version, so the two can never run side by side. These three keep the
+        // old BtrfsUsbMounter name on purpose: a running pre-rename copy must still see (and answer) a new one
         public const string MutexName = @"Local\BtrfsUsbMounter.GUI";
         private const string AckEventName = @"Local\BtrfsUsbMounter.Ack";
         private static readonly IntPtr HwndBroadcast = new IntPtr(0xffff);
@@ -233,12 +234,12 @@ namespace BtrfsUsbMounter
     internal sealed class CommandLineOptions
     {
         public const string Usage =
-            "Btrfs USB Mounter - mount Linux and Mac USB drives through WSL2\r\n" +
+            "Xnix USB Mounter - mount Linux and Mac USB drives through WSL2\r\n" +
             AppInfo.Copyright + ". Licensed under the " + AppInfo.LicenseName + ".\r\n" +
             AppInfo.LicenseSummary + "\r\n" +
             AppInfo.NoWarranty + "\r\n" +
             "Full terms: the LICENSE file next to the program, or " + AppInfo.LicenseUrl + "\r\n\r\n" +
-            "Usage: BtrfsUsbMounter [options]\r\n\r\n" +
+            "Usage: XnixUsbMounter [options]\r\n\r\n" +
             "  (no options)       open the window\r\n" +
             "  --tray             start hidden in the system tray\r\n" +
             "  --list             list detected filesystems (btrfs, ext2/3/4, XFS, JFS, ReiserFS,\r\n" +

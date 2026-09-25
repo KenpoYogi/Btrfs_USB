@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -17,7 +17,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     /// <summary>Environment details written to mounter.log at startup, for troubleshooting.</summary>
     public static class Diagnostics
@@ -31,7 +31,7 @@ namespace BtrfsUsbMounter.Core
                 string version = entry.GetName().Version.ToString();
                 string exe = AppPaths.ExePath;
                 var sb = new StringBuilder();
-                sb.AppendFormat(CultureInfo.InvariantCulture, "==== Btrfs USB Mounter {0} starting ({1}) ====", version, mode);
+                sb.AppendFormat(CultureInfo.InvariantCulture, "==== Xnix USB Mounter {0} starting ({1}) ====", version, mode);
                 Line(sb, "Command line", Environment.CommandLine);
                 Line(sb, "Arguments", args == null || args.Length == 0 ? "(none)" : string.Join(" | ", args));
                 Line(sb, "Executable", exe + FileStamp(exe));

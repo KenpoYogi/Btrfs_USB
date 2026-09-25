@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -10,13 +10,13 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using BtrfsUsbMounter.Core;
+using XnixUsbMounter.Core;
 
-namespace BtrfsUsbMounter.UI
+namespace XnixUsbMounter.UI
 {
     internal static class UiKit
     {
-        public const string AppName = "Btrfs USB Mounter";
+        public const string AppName = "Xnix USB Mounter";
 
         public static readonly Font BaseFont = new Font("Segoe UI", 9f);
         public static readonly Font BoldFont = new Font("Segoe UI", 9f, FontStyle.Bold);

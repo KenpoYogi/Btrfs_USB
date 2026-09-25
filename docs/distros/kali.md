@@ -1,7 +1,7 @@
-# Btrfs USB Mounter with Kali Linux
+# Xnix USB Mounter with Kali Linux
 
 Kali is a Debian-based distro for security testing. The WSL image is minimal, but it installs
-everything Btrfs USB Mounter needs. With **Tools > Build filesystem drivers** it opens as many
+everything Xnix USB Mounter needs. With **Tools > Build filesystem drivers** it opens as many
 filesystems as openSUSE Tumbleweed. Kali is tested with the app, together with Tumbleweed.
 
 | What you want to open | Works on Kali? |
@@ -15,7 +15,7 @@ filesystems as openSUSE Tumbleweed. Kali is tested with the app, together with T
 **Don't install `libfsapfs-utils` on Kali.** Its `fsapfsmount` exists but only prints *"No sub system
 to mount APFS format"* (the Kali build has no FUSE support), and because the command is there the app
 would try it instead of the APFS driver. Mac drives work with the built APFS driver instead. Online
-guides that build `apfs-fuse` from source don't help either: Btrfs USB Mounter doesn't use it.
+guides that build `apfs-fuse` from source don't help either: Xnix USB Mounter doesn't use it.
 
 **Kali's `zfs-dkms` and `apfs-dkms` packages don't work in WSL.** DKMS compiles a driver against the
 headers of the running kernel, and Microsoft's WSL kernel has no headers package, so they build
@@ -99,14 +99,14 @@ apt install -y btrfs-progs util-linux kmod
 | `kmod` | **Required.** `modinfo` / `modprobe` check and load drivers |
 | `e2fsprogs`, `xfsprogs` | Optional: check or repair ext and XFS drives by hand (`fsck.ext4`, `xfs_repair`) |
 
-Kali's usual security tools (`kali-linux-default`) are not needed for Btrfs USB Mounter.
+Kali's usual security tools (`kali-linux-default`) are not needed for Xnix USB Mounter.
 
 ### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS)
 
-The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them for you
+The WSL kernel from Microsoft has no drivers for these, so Xnix USB Mounter compiles them for you
 with Kali's own compiler (`gcc-13`) and the WSL kernel's source code:
 
-1. In Btrfs USB Mounter pick **kali-linux** in the **WSL2 distro** box, then choose **Tools > Build
+1. In Xnix USB Mounter pick **kali-linux** in the **WSL2 distro** box, then choose **Tools > Build
    filesystem drivers**.
 2. Wait. The first run takes 20-40 minutes and needs about 5 GB of free space in Kali. It installs the
    build tools and `zfsutils-linux` with apt, and downloads the WSL kernel source (about 250 MB),
@@ -141,10 +141,10 @@ done
 
 `btrfs`, `blkid` and `modinfo` must say **OK**. `zpool` appears after the driver build (ZFS only).
 
-## Step 5: Use it with Btrfs USB Mounter
+## Step 5: Use it with Xnix USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `BtrfsUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **kali-linux**. To make it the default for everything,
    run `wsl --set-default kali-linux` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -153,7 +153,7 @@ done
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\BtrfsUsbMounter --list`.
+`.\XnixUsbMounter --list`.
 
 ## Troubleshooting
 
@@ -174,7 +174,7 @@ To test from the command line, open an administrator terminal in the program fol
 This deletes Kali **and every file inside it**, including the built drivers and the kernel source
 (about 5 GB). Your USB drives and other WSL distros are not touched.
 
-1. In Btrfs USB Mounter, **Eject** every drive that is mounted with Kali, then pick another distro in
+1. In Xnix USB Mounter, **Eject** every drive that is mounted with Kali, then pick another distro in
    the **WSL2 distro** box (or close the app).
 2. In a terminal (no administrator rights needed):
 

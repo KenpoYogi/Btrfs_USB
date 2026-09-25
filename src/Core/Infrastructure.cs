@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -12,7 +12,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     /// <summary>Copyright and license notices, shared by the window, the command line and the log.</summary>
     public static class AppInfo
@@ -33,6 +33,7 @@ namespace BtrfsUsbMounter.Core
     /// <summary>Well-known file locations. Shared with the earlier PowerShell version, so settings carry over.</summary>
     public static class AppPaths
     {
+        // keeps the pre-rename folder name on purpose: state.json and the log carry over to XnixUsbMounter
         public static readonly string AppDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BtrfsUsbMounter");
 

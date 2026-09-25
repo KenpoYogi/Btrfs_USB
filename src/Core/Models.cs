@@ -1,4 +1,4 @@
-// Btrfs USB Mounter
+// Xnix USB Mounter
 // Copyright (c) 2026 Jay Weiner
 // SPDX-License-Identifier: LicenseRef-MIT-Commons-Clause
 //
@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 
-namespace BtrfsUsbMounter.Core
+namespace XnixUsbMounter.Core
 {
     // ---------------------------------------------------------------------------------------
     //  Persisted state (state.json) - member names match the PowerShell version's file

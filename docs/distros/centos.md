@@ -1,4 +1,4 @@
-# Btrfs USB Mounter with CentOS (and AlmaLinux)
+# Xnix USB Mounter with CentOS (and AlmaLinux)
 
 **CentOS Linux has reached end of life** (CentOS 8 in 2021, CentOS 7 in 2024) and gets no more
 updates. Its successor, **CentOS Stream**, has official WSL images, but they are not in
@@ -175,10 +175,10 @@ done
 
 All three must say **OK**.
 
-## Step 5: Use it with Btrfs USB Mounter
+## Step 5: Use it with Xnix USB Mounter
 
 1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `BtrfsUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+   `XnixUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **CentOS-Stream-10** (or **AlmaLinux-10**). To make it
    the default for everything, run `wsl --set-default CentOS-Stream-10` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -187,7 +187,7 @@ All three must say **OK**.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
 To test from the command line, open an administrator terminal in the program folder and run
-`.\BtrfsUsbMounter --list`.
+`.\XnixUsbMounter --list`.
 
 ## Troubleshooting
 
