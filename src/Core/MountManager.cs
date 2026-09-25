@@ -270,6 +270,22 @@ namespace BtrfsUsbMounter.Core
                 mountOptions = apfsWrite ? "readwrite" : string.Empty;   // linux-apfs-rw mounts read-only unless asked
                 if (apfsWrite) Log.Warn("APFS write support is EXPERIMENTAL (linux-apfs-rw). Keep a backup of this drive.");
             }
+            if (kind == FsKind.Ufs)
+            {
+                // the driver cannot tell the UFS variants apart (ufstype); wsl --mount turns "ro" into the read-only flag
+                mountOptions = (readOnly ? "ro," : string.Empty) + volume.FsOptions;
+                if (!readOnly)
+                {
+                    Log.Warn("UFS write support is EXPERIMENTAL (the Linux ufs driver). Keep a backup of this drive, and eject it " +
+                             "before unplugging.");
+                    if (!string.IsNullOrEmpty(volume.FsWriteNote)) Log.Warn("Note: " + volume.FsWriteNote);
+                }
+                else if (state.Settings.UfsWrite && !volume.ReadOnly)
+                {
+                    Log.Warn("The UFS driver in " + distro + " was not built by Tools > Build filesystem drivers, so it lacks the " +
+                             "changes that keep the filesystem consistent for FreeBSD; mounting read-only. Build the drivers to write.");
+                }
+            }
             Log.Info(string.Format("Mounting {0} '{1}' (disk {2}, {3}) as '{4}' via {5}{6}...", volume.KindName, volume.DisplayLabel,
                 volume.DiskNumber, partText, name, distro, readOnly ? ", read-only" : string.Empty));
             Log.Debug("Mount method: " + method + (mountOptions.Length > 0 ? ", options " + mountOptions : string.Empty));
@@ -283,6 +299,14 @@ namespace BtrfsUsbMounter.Core
             {
                 if (state.MountCount == 0) StopKeepAlive();
                 return null;
+            }
+            // not cancellable: the drive is mounted now and must be recorded below
+            if (method == MountMethod.Kernel && !readOnly && await MountedReadOnlyAsync(distro, name, CancellationToken.None).ConfigureAwait(false))
+            {
+                // e.g. UFS or ext4 that needs a check: the kernel falls back to read-only instead of failing
+                readOnly = true;
+                Log.Warn(string.Format("The {0} driver mounted '{1}' read-only instead of read/write. Last kernel messages:", volume.KindName, name));
+                await LogKernelMessagesAsync(distro, CancellationToken.None).ConfigureAwait(false);
             }
 
             var entry = new MountEntry
@@ -315,7 +339,49 @@ namespace BtrfsUsbMounter.Core
             {
                 return !(state.Settings.ApfsWrite && support.MethodFor(distro, FsKind.Apfs, true) == MountMethod.Kernel);
             }
+            if (volume.Kind == FsKind.Ufs)
+            {
+                return volume.ReadOnly || !(state.Settings.UfsWrite && support.CanWriteUfs(distro));
+            }
             return volume.ReadOnly;
+        }
+
+        /// <summary>Whether /mnt/wsl/name is mounted read-only (a failed check counts as no).</summary>
+        private static async Task<bool> MountedReadOnlyAsync(string distro, string name, CancellationToken ct)
+        {
+            try
+            {
+                WslResult r = await Wsl.RunRootAsync(distro, "awk '$2 == \"/mnt/wsl/" + name + "\" { print $4 }' /proc/mounts", 30, ct)
+                    .ConfigureAwait(false);
+                string options = r.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+                return r.ExitCode == 0 && options != null && options.Trim().Split(',')[0] == "ro";
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.DebugException("Checking whether the mount is read-only failed", ex);
+                return false;
+            }
+        }
+
+        private static async Task LogKernelMessagesAsync(string distro, CancellationToken ct)
+        {
+            try
+            {
+                WslResult dm = await Wsl.RunRootAsync(distro, "dmesg | tail -n 8", 30, ct).ConfigureAwait(false);
+                foreach (string l in dm.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) Log.Warn("    " + l);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.DebugException("dmesg failed", ex);   // diagnostics only
+            }
         }
 
         /// <summary>
@@ -522,31 +588,12 @@ namespace BtrfsUsbMounter.Core
             {
                 Log.Warn("Hint: " + FsTypes.NoDriverHint(kind) + " If the kernel does have the driver, the filesystem may use " +
                          "features newer than the WSL kernel supports; the kernel messages below say which.");
-                try
-                {
-                    WslResult dm = await Wsl.RunRootAsync(distro, "dmesg | tail -n 8", 30, ct).ConfigureAwait(false);
-                    foreach (string l in dm.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) Log.Warn("    " + l);
-                }
-                catch (Exception ex)
-                {
-                    Log.DebugException("dmesg failed", ex);
-                }
+                await LogKernelMessagesAsync(distro, ct).ConfigureAwait(false);
             }
             else if (Regex.IsMatch(msg, "failed to mount|attached but", RegexOptions.IgnoreCase))
             {
                 Log.Warn(string.Format("Hint: the disk attached but {0} refused to mount it. Last kernel messages:", FsTypes.DisplayName(kind)));
-                try
-                {
-                    WslResult dm = await Wsl.RunRootAsync(distro, "dmesg | tail -n 8", 30, ct).ConfigureAwait(false);
-                    foreach (string l in dm.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        Log.Warn("    " + l);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.DebugException("dmesg failed", ex);   // diagnostics only
-                }
+                await LogKernelMessagesAsync(distro, ct).ConfigureAwait(false);
                 try { await Wsl.RunAsync(new[] { "--unmount", diskPath }, 60, ct).ConfigureAwait(false); }
                 catch (Exception ex) { Log.DebugException("Detaching after the failed mount failed", ex); }
                 Log.Info("Disk detached again so Windows can use it.");
@@ -904,6 +951,8 @@ namespace BtrfsUsbMounter.Core
                         row.Kind = sb.Kind;
                         row.ReadOnly = sb.ReadOnly;
                         row.FsNote = sb.Note;
+                        row.FsWriteNote = sb.WriteNote;
+                        row.FsOptions = sb.KernelOptions;
                         row.Label = sb.Label;
                         row.Uuid = sb.Uuid;
                         row.NumDevices = sb.NumDevices;

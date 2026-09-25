@@ -1,7 +1,7 @@
 # Btrfs USB Mounter with openSUSE Leap
 
 openSUSE Leap is the stable, fixed-release openSUSE. Everyday mounting works well. Leap 16.0 has
-everything the extra drivers (JFS, HFS+, ZFS, APFS read/write) need: `gcc13` in its own repositories
+everything the extra drivers (JFS, HFS+, UFS, ZFS, APFS read/write) need: `gcc13` in its own repositories
 and ZFS tools in openSUSE's *filesystems* repository. The driver build is only tested on
 [openSUSE Tumbleweed](opensuse-tumbleweed.md), though.
 
@@ -10,6 +10,7 @@ and ZFS tools in openSUSE's *filesystems* repository. The driver build is only t
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental), after [Extra drivers](#extra-drivers) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 WSL install name: **`openSUSE-Leap-16.0`**
@@ -116,7 +117,7 @@ Type `exit` to leave the root shell.
 
 ### Extra drivers
 
-The WSL kernel from Microsoft has no drivers for JFS, HFS+, ZFS or APFS read/write, so Btrfs USB
+The WSL kernel from Microsoft has no drivers for JFS, HFS+, UFS, ZFS or APFS read/write, so Btrfs USB
 Mounter compiles them: **Tools > Build filesystem drivers**. Leap 16.0 has what the build needs.
 The compiler is `gcc13` from Leap's own repositories. For ZFS, install `zfs` from the *filesystems*
 repository first (above). **This is tested on Tumbleweed only.** If it fails on Leap, please report it
@@ -130,6 +131,10 @@ it in the app.
 
 The drivers survive WSL restarts (the app puts them back when needed). **Run the build again after
 every `wsl --update`**: a new WSL kernel needs its own build.
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool: check UFS drives with `fsck_ffs` on FreeBSD.
 
 ## Step 4: Check the setup
 
@@ -167,6 +172,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`; ZFS: install `zfs` from the *filesystems* repository (Step 3). Then click **Refresh** |
 | `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Status says *No driver* | That filesystem needs the extra drivers: see [Extra drivers](#extra-drivers) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 
 To remove the distro **and every file inside it**: `wsl --unregister openSUSE-Leap-16.0`. Your USB

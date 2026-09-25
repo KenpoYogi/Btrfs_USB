@@ -8,7 +8,8 @@ filesystems as openSUSE Tumbleweed. Kali is tested with the app, together with T
 |---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow APFS writes** (experimental) |
-| JFS, HFS+ (Mac), ZFS | Yes, after **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-zfs-apfs)) |
+| JFS, HFS+ (Mac), ZFS | Yes, after **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-ufs-zfs-apfs)) |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 **Don't install `libfsapfs-utils` on Kali.** Its `fsapfsmount` exists but only prints *"No sub system
@@ -100,7 +101,7 @@ apt install -y btrfs-progs util-linux kmod
 
 Kali's usual security tools (`kali-linux-default`) are not needed for Btrfs USB Mounter.
 
-### Optional: extra drivers (JFS, HFS+, ZFS, APFS)
+### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS)
 
 The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them for you
 with Kali's own compiler (`gcc-13`) and the WSL kernel's source code:
@@ -118,6 +119,12 @@ when needed. **Run the build again after every `wsl --update`**: a new WSL kerne
 
 Optional check tools for these filesystems: `apt install -y jfsutils apfsprogs` (`fsck.jfs`,
 `apfsck`).
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool (Debian dropped `ufsutils`): check UFS drives
+with `fsck_ffs` on FreeBSD. Kali's `makefs` package can make UFS1 test images; its UFS2 images put the
+superblock where neither Linux nor FreeBSD finds it.
 
 Type `exit` to leave the root shell. Tip: to hide Kali's welcome message in your own user's shell,
 run `touch ~/.hushlogin` there.
@@ -158,6 +165,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Run **Tools > Build filesystem drivers** (it builds the APFS driver and installs `zfsutils-linux`), then click **Refresh** |
 | Status says *No driver* | Run **Tools > Build filesystem drivers** (again after a `wsl --update`) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | `apt install zfs-dkms` or `apfs-dkms` builds no driver, or a guide asks for `linux-headers-$(uname -r)` | Expected in WSL: there are no headers for the WSL kernel, so DKMS builds nothing and the headers package doesn't exist. `apt remove zfs-dkms apfs-dkms`, then use **Tools > Build filesystem drivers** |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

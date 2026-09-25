@@ -76,7 +76,7 @@ namespace BtrfsUsbMounter.UI
         private ToolStripMenuItem trayUnmountAll;
         private ContextMenuStrip toolsMenu;
         private ToolStripMenuItem miInfo, miScrub, miCancelScrub, miCheck, miInstall, miReports, miDebugLog, miOpenLog, miAbout;
-        private ToolStripMenuItem miBuildDrivers, miApfsWrite;
+        private ToolStripMenuItem miBuildDrivers, miApfsWrite, miUfsWrite;
         private System.Windows.Forms.Timer housekeeping;
         private System.Windows.Forms.Timer logTimer;
 
@@ -249,12 +249,13 @@ namespace BtrfsUsbMounter.UI
             miDebugLog = new ToolStripMenuItem("Show detailed log lines") { CheckOnClick = true };
             miOpenLog = new ToolStripMenuItem("Open log file");
             miAbout = new ToolStripMenuItem("About and license...");
-            miBuildDrivers = new ToolStripMenuItem("Build filesystem drivers (JFS, ReiserFS, HFS+, ZFS, APFS)...");
+            miBuildDrivers = new ToolStripMenuItem("Build filesystem drivers (JFS, ReiserFS, HFS+, UFS, ZFS, APFS)...");
             miApfsWrite = new ToolStripMenuItem("Allow APFS writes (experimental)") { Checked = settings.ApfsWrite };
+            miUfsWrite = new ToolStripMenuItem("Allow UFS writes (experimental)") { Checked = settings.UfsWrite };
             toolsMenu.Items.AddRange(new ToolStripItem[]
             {
                 miInfo, new ToolStripSeparator(), miScrub, miCancelScrub, miCheck, new ToolStripSeparator(), miInstall, miReports,
-                new ToolStripSeparator(), miBuildDrivers, miApfsWrite,
+                new ToolStripSeparator(), miBuildDrivers, miApfsWrite, miUfsWrite,
                 new ToolStripSeparator(), miDebugLog, miOpenLog, new ToolStripSeparator(), miAbout
             });
             list.ContextMenuStrip = toolsMenu;
@@ -314,6 +315,7 @@ namespace BtrfsUsbMounter.UI
             miAbout.Click += (s, e) => ShowAbout();
             miBuildDrivers.Click += (s, e) => RequestBuildDrivers();
             miApfsWrite.Click += (s, e) => ToggleApfsWrite();
+            miUfsWrite.Click += (s, e) => ToggleUfsWrite();
             miOpenLog.Click += (s, e) =>
             {
                 try
@@ -502,6 +504,29 @@ namespace BtrfsUsbMounter.UI
             RenderVolumes();
         }
 
+        private void ToggleUfsWrite()
+        {
+            bool enable = !engine.State.Settings.UfsWrite;
+            if (enable)
+            {
+                DialogResult answer = UiKit.Show(this,
+                    "Mount UFS drives (FreeBSD, NetBSD, OpenBSD) read/write?\r\n\r\n" +
+                    "The Linux UFS driver's write support is EXPERIMENTAL: it can corrupt the drive. It needs the driver " +
+                    "built by Tools > Build filesystem drivers, which also keeps the drive consistent for FreeBSD. Solaris UFS " +
+                    "and drives that were not cleanly unmounted stay read-only.\r\n\r\n" +
+                    "On FreeBSD 12 and later drives, writing switches off the metadata check hashes; fsck_ffs on FreeBSD can " +
+                    "turn them back on. Always eject before unplugging: otherwise FreeBSD needs a full fsck_ffs.\r\n\r\n" +
+                    "Only enable this for drives you have a backup of.",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+            }
+            engine.State.UpdateSettings(x => x.UfsWrite = enable);
+            miUfsWrite.Checked = enable;
+            Log.Info(enable ? "UFS drives will be mounted read/write (experimental) when the locally built UFS driver is installed."
+                            : "UFS drives will be mounted read-only.");
+            RenderVolumes();
+        }
+
         /// <summary>Runs tools/build-wsl-modules.sh as root in the distro, streaming its progress into the log.</summary>
         private async void RequestBuildDrivers()
         {
@@ -518,7 +543,7 @@ namespace BtrfsUsbMounter.UI
                 return;
             }
             DialogResult answer = UiKit.Show(this,
-                "Build the JFS, ReiserFS (kernels before 6.13 only), HFS+, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
+                "Build the JFS, ReiserFS (kernels before 6.13 only), HFS+, UFS, ZFS and APFS drivers for the running WSL kernel in " + distro + "?\r\n\r\n" +
                 "This installs compilers in the distro (zypper on openSUSE and SLES, apt on Debian, Kali and Ubuntu), downloads the WSL kernel source (about 250 MB), " +
                 "OpenZFS and linux-apfs-rw, and compiles them. The first run takes 15-40 minutes; later runs are quicker. " +
                 "Other tasks wait until it finishes. Rerun it after every \"wsl --update\".\r\n\r\n" +
@@ -837,7 +862,7 @@ namespace BtrfsUsbMounter.UI
             list.EndUpdate();
             emptyLabel.Visible = list.Items.Count == 0;
             emptyLabel.Text = "No supported filesystems found.\r\n\r\nPlug in a USB hard drive with btrfs, ext2/3/4, XFS, JFS, ReiserFS, " +
-                              "Reiser4, ZFS, HFS+ or APFS - it will appear here automatically.";
+                              "Reiser4, ZFS, HFS+, APFS or UFS - it will appear here automatically.";
             UpdateButtonState();
         }
 

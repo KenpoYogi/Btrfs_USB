@@ -15,6 +15,7 @@ SLES is SUSE's commercial distro. It works well for btrfs, ext and XFS drives. T
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` from SUSE Package Hub (needs registration) |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: see [Extra drivers](#extra-drivers) |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental), after [Extra drivers](#extra-drivers) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 WSL install names: **`SUSE-Linux-Enterprise-16.0`** or **`SUSE-Linux-Enterprise-15-SP7`**
@@ -154,7 +155,7 @@ Type `exit` to leave the root shell.
 
 ### Extra drivers
 
-The WSL kernel from Microsoft has no drivers for JFS, HFS+, ZFS or APFS read/write, so Btrfs USB
+The WSL kernel from Microsoft has no drivers for JFS, HFS+, UFS, ZFS or APFS read/write, so Btrfs USB
 Mounter compiles them: **Tools > Build filesystem drivers**. **This is tested on openSUSE Tumbleweed
 only.** It should work on SLES because the pieces it needs exist there:
 
@@ -175,6 +176,10 @@ The drivers survive WSL restarts (the app puts them back when needed). **Run the
 every `wsl --update`**: a new WSL kernel needs its own build. If the build fails on SLES, please report
 it with `mounter.log`. As a fallback you can install [openSUSE Tumbleweed](opensuse-tumbleweed.md) next
 to SLES and pick it in the app.
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool: check UFS drives with `fsck_ffs` on FreeBSD.
 
 ## Step 4: Check the setup
 
@@ -213,6 +218,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfsprogs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: install `libfsapfs` from Package Hub (Step 3), then click **Refresh**. ZFS: install `zfs` from the *filesystems* repository (Step 3) |
 | Status says *No driver* | That filesystem needs the extra drivers: see [Extra drivers](#extra-drivers) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

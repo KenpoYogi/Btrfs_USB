@@ -83,6 +83,7 @@ Whether a filesystem can be mounted depends on the WSL kernel, and is checked at
 | HFS+ / HFSX | yes | read/write* | `wsl --mount --type hfsplus` with the locally built `hfsplus` module; journaled volumes mount read-only |
 | ZFS | yes | read/write* | `wsl --mount --bare`, then `zpool import -R /mnt/wsl` (locally built OpenZFS module + `zfs` package); eject = `zpool export` |
 | APFS | yes | read-only, or read/write* (experimental) | read-only: `fsapfsmount` (FUSE, package `libfsapfs`), all volumes; read/write: the locally built `linux-apfs-rw` driver after **Tools > Allow APFS writes**, first volume only; no FileVault |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | yes | read-only*, or read/write* (experimental) | `wsl --mount --type ufs --options ufstype=ufs2` (or `44bsd` for UFS1) with the locally built `ufs` module; read/write after **Tools > Allow UFS writes**. Solaris UFS, and drives not cleanly unmounted, stay read-only |
 | Reiser4 | yes | no | never in mainline Linux; its patches stop at Linux 5.16 |
 
 \* needs the drivers built for the running WSL kernel: **Tools > Build filesystem drivers**, or
@@ -92,10 +93,12 @@ these drivers, and the distros' own driver packages (`*-kmp-default`, `zfs-dkms`
 for the distro's kernel or need its headers, which WSL doesn't have. The script:
 
 1. downloads the WSL kernel source for `uname -r` from github.com/microsoft/WSL2-Linux-Kernel and
-   configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS and (before
-   Linux 6.13) ReiserFS as modules
+   configures it with the running kernel's `/proc/config.gz`, plus JFS, HFS+, HFS, UFS (with write
+   support) and (before Linux 6.13) ReiserFS as modules
 2. builds vmlinux once for symbol versions and checks them against Microsoft's own `btrfs.ko`
-3. builds the in-tree drivers, OpenZFS (same version as the installed `zfs` package) and linux-apfs-rw
+3. builds the in-tree drivers, OpenZFS (same version as the installed `zfs` package) and linux-apfs-rw.
+   UFS is built from a copy of `fs/ufs` with a small change that keeps FreeBSD's view of the
+   filesystem consistent (see UFS below)
 4. keeps them in `/var/lib/wsl-modules/<release>` on the distro's disk, installs them in
    `/lib/modules/<release>/extra`, runs `depmod`, and loads each to test it. WSL keeps `/lib/modules/<release>`
    in memory, so after a WSL restart the app copies the drivers back (and runs `depmod`) before it
@@ -114,6 +117,43 @@ Notes:
   in) are for openSUSE's own kernel and never load under WSL. `zfs` depends on `zfs-kmp`, so they stay.
 - ZFS: only pools on real disks (or loop devices) work; WSL's mount namespaces stop the ZFS module
   from opening image files that live inside the distro. Pools are imported by GUID, never with `-f`.
+
+### UFS
+
+Linux needs to be told which UFS variant it is mounting, and the app reads that from the superblock:
+`ufstype=ufs2` for UFS2, `44bsd` for UFS1 from the BSDs, `sun` / `sunx86` for Solaris (read-only). The
+drive mounts read-only unless **Tools > Allow UFS writes (experimental)** is ticked and the `ufs` driver
+is the one **Build filesystem drivers** made (it is marked with `modinfo -F wsl_handoff ufs` = 1). Linux's
+UFS write support is marked experimental by the kernel itself, so keep a backup.
+
+Linux's driver does not know FreeBSD's newer features, so the build script changes it (in a copy of
+`fs/ufs`) to hand the filesystem back the way FreeBSD expects:
+
+- while mounted read/write the superblock says *not clean*, as FreeBSD does itself; a clean unmount
+  (Eject) sets it back. Stock Linux leaves it *clean*, so a drive unplugged mid-write would look fine
+  to FreeBSD and never get checked
+- FreeBSD 12+ metadata **check hashes** (superblock, cylinder groups, inodes) are switched off on the
+  first read/write mount, the way FreeBSD itself expects from a kernel that cannot maintain them. To
+  turn them back on, run `fsck_ffs` on the unmounted filesystem on FreeBSD (without `-p` or `-y`) and
+  answer yes to the *ADD ... CHECK-HASH PROTECTION* questions
+- with **journaled soft updates** (FreeBSD's default), the mount time is updated, so FreeBSD's fsck
+  never replays an old journal over Linux's changes; after an unclean unmount it does a full check
+- only a superblock marked *clean* (1) may be written; NetBSD marks mounted filesystems with 2, which
+  stock Linux also accepts as clean
+
+Tested with FreeBSD 15.1 (`newfs -U -j`, UFS2 with journaled soft updates and check hashes, and
+`newfs -O1 -U`, UFS1): after Linux wrote to them, FreeBSD's `fsck_ffs -n` found them clean and every
+file checksum matched; a disk copied while Linux had it mounted read/write was refused by FreeBSD
+(*not clean - run fsck*) and `fsck_ffs -p` did a full check. A UFS1 image made by NetBSD's `makefs`
+(on Kali) also checked clean in FreeBSD, with every checksum matching, after Linux wrote to it. Real
+NetBSD, OpenBSD and Solaris disks are not tested yet. FreeBSD's fsck may ask *UPDATE FILESYSTEM
+TO TRACK DIRECTORY DEPTH* for folders made on Linux: harmless, answer yes (`-p` does it by itself).
+
+Limits: GPT `freebsd-ufs` partitions and unpartitioned disks work. UFS inside an MBR slice with a BSD
+disklabel (older FreeBSD installs, `ada0s1a` and so on) is normally not found: the app looks at the start
+of each Windows partition, and does not read BSD disklabels. FreeBSD's gjournal is not supported (read-only). Fragments larger than 4 KiB cannot be mounted.
+Linux ignores UFS2 extended attributes (FreeBSD ACLs and MAC labels): deleting such a file on Linux
+leaves its attribute block allocated until the next `fsck_ffs`.
 
 The Status column shows *Ready*, *Ready (read-only)*, *No driver*, *Needs tools* or *Not mountable*;
 the log says why and what to do. The app only checks whether a driver exists (`modinfo`) and loads it
@@ -174,7 +214,7 @@ src/Core/Models.cs          persisted state, disks, volumes, btrfs results
 src/Core/StateStore.cs      thread-safe state.json (atomic writes)
 src/Core/Wsl.cs             async wsl.exe runner (timeouts, cancel, streaming), distros
 src/Core/Disks.cs           raw partition reader, cache, WMI Storage API enumeration
-src/Core/FileSystems.cs     filesystem signatures (btrfs, ext, XFS, JFS, Reiser, ZFS, HFS+, APFS), runtime support check
+src/Core/FileSystems.cs     filesystem signatures (btrfs, ext, XFS, JFS, Reiser, ZFS, HFS+, APFS, UFS), runtime support check
 src/Core/BtrfsParsers.cs    btrfs usage / device stats / scrub status parsers
 src/Core/MountManager.cs    mount, flush-and-eject, keep-alive, state sync, scanner
 src/Core/Services.cs        maintenance (scrub, check, tools), logon task, job queue, engine

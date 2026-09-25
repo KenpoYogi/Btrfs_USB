@@ -69,8 +69,8 @@ namespace BtrfsUsbMounter.Core
 
         private static string Describe(AppSettings s)
         {
-            return string.Format(CultureInfo.InvariantCulture, "[distro '{0}', auto-mount {1}, open Explorer {2}, all disks {3}, options '{4}', APFS write {5}]",
-                s.Distro, s.AutoMount, s.OpenExplorer, s.ShowAllDisks, s.Options, s.ApfsWrite);
+            return string.Format(CultureInfo.InvariantCulture, "[distro '{0}', auto-mount {1}, open Explorer {2}, all disks {3}, options '{4}', APFS write {5}, UFS write {6}]",
+                s.Distro, s.AutoMount, s.OpenExplorer, s.ShowAllDisks, s.Options, s.ApfsWrite, s.UfsWrite);
         }
 
         private static string Describe(IEnumerable<MountEntry> mounts)

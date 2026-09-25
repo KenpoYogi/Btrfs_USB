@@ -7,7 +7,7 @@ Fedora uses btrfs itself, so btrfs drives are well supported. Fedora has no pack
 |---|---|
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | No (`fsapfsmount` is not packaged for Fedora) |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
+| JFS, HFS+ (Mac), UFS (BSD), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 **Tools > Build filesystem drivers** needs a distro with zypper or apt (openSUSE, SLES, Debian,

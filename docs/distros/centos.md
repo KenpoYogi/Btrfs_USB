@@ -11,7 +11,7 @@ installs with one command and has `btrfs-progs` in its own repositories.
 |---|---|---|---|
 | btrfs, ext2/3/4, XFS | Yes (btrfs tools from EPEL) | Yes | Yes (btrfs tools from EPEL) |
 | APFS (Mac drives), read-only | No (`fsapfsmount` not packaged) | No | No |
-| JFS, HFS+ (Mac), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) | No | No |
+| JFS, HFS+ (Mac), UFS (BSD), ZFS, APFS read/write | No; use [openSUSE Tumbleweed](opensuse-tumbleweed.md) | No | No |
 | ReiserFS, Reiser4 | No (detected only) | No | No |
 
 Red Hat-family distros don't ship `btrfs-progs` themselves (AlmaLinux 10 is the exception). On the

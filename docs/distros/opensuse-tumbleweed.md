@@ -8,6 +8,7 @@ one where every feature works, including the extra drivers built by **Tools > Bu
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs` |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Yes, after **Tools > Build filesystem drivers** |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | After **Tools > Build filesystem drivers**: read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
 | ReiserFS | Only on WSL kernels older than 6.13 (Linux 6.13 removed it) |
 | Reiser4 | No (detected only) |
 
@@ -103,7 +104,7 @@ zypper install -y zfs
 kernel, which WSL never starts, so they do nothing, but they must stay installed because `zfs`
 depends on them.
 
-### Optional: extra drivers (JFS, HFS+, ZFS, APFS read/write)
+### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS read/write)
 
 The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them for you:
 
@@ -115,6 +116,10 @@ The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter com
 The drivers survive WSL and Windows restarts: they are kept on the distro's disk and the app puts
 them back when needed. **Run the build again after every `wsl --update`**: a new WSL kernel needs its
 own build. Later runs are quicker.
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool: check UFS drives with `fsck_ffs` on FreeBSD.
 
 Type `exit` to leave the root shell.
 
@@ -153,6 +158,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfsprogs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`; ZFS: install `zfs` (Step 3). Then click **Refresh** |
 | Status says *No driver* | Run **Tools > Build filesystem drivers** (again, after a `wsl --update`) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | "The driver build script is missing" | Copy the `tools\` folder next to `BtrfsUsbMounter.exe` |
 | `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |

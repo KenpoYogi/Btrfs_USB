@@ -32,7 +32,8 @@ namespace BtrfsUsbMounter.Core
         Reiser4,
         Zfs,
         HfsPlus,
-        Apfs
+        Apfs,
+        Ufs
     }
 
     public enum MountMethod
@@ -65,6 +66,7 @@ namespace BtrfsUsbMounter.Core
                 case FsKind.Zfs: return "zfs";
                 case FsKind.HfsPlus: return "hfsplus";
                 case FsKind.Apfs: return "apfs";
+                case FsKind.Ufs: return "ufs";
                 default: return kind.ToString().ToLowerInvariant();
             }
         }
@@ -80,6 +82,7 @@ namespace BtrfsUsbMounter.Core
                 case FsKind.Zfs: return "ZFS";
                 case FsKind.HfsPlus: return "HFS+";
                 case FsKind.Apfs: return "APFS";
+                case FsKind.Ufs: return "UFS";
                 default: return Name(kind);
             }
         }
@@ -112,7 +115,8 @@ namespace BtrfsUsbMounter.Core
         /// <summary>Kinds whose driver tools/build-wsl-modules.sh can compile for the running WSL kernel.</summary>
         public static bool Buildable(FsKind kind)
         {
-            return kind == FsKind.Jfs || kind == FsKind.ReiserFs || kind == FsKind.HfsPlus || kind == FsKind.Zfs || kind == FsKind.Apfs;
+            return kind == FsKind.Jfs || kind == FsKind.ReiserFs || kind == FsKind.HfsPlus || kind == FsKind.Zfs || kind == FsKind.Apfs ||
+                   kind == FsKind.Ufs;
         }
 
         /// <summary>Advice when the running WSL kernel has no driver for a kernel-mounted kind.</summary>
@@ -156,6 +160,10 @@ namespace BtrfsUsbMounter.Core
         public bool ReadOnly { get; set; }
         /// <summary>User-facing caveat, shown in the log when mounting.</summary>
         public string Note { get; set; }
+        /// <summary>Caveat shown only when mounting read/write (UFS: what changes for FreeBSD).</summary>
+        public string WriteNote { get; set; }
+        /// <summary>Options the kernel driver needs to mount it at all (UFS: ufstype=...).</summary>
+        public string KernelOptions { get; set; }
 
         public FsInfo()
         {
@@ -198,6 +206,7 @@ namespace BtrfsUsbMounter.Core
             Add(found, HfsPlus(b));
             Add(found, Apfs(b));
             Add(found, Zfs(b));
+            Add(found, Ufs(b));
             return found;
         }
 
@@ -557,6 +566,133 @@ namespace BtrfsUsbMounter.Core
             }
             return result;
         }
+
+        // ---- UFS (FreeBSD, NetBSD, OpenBSD, Solaris): UFS2 superblock at 64 KiB, UFS1 at 8 KiB, either byte order ----
+        private const uint UfsMagic1 = 0x00011954;
+        private const uint UfsMagic2 = 0x19540119;
+        private const uint UfsStateOk = 0x7c269d38;     // Solaris: fs_state = UfsStateOk - fs_time when clean
+        private const byte UfsFlagsUpdated = 0x80;      // in the old 8-bit flags: the 32-bit fs_flags are in use
+        private const uint UfsSoftDep = 0x02, UfsNeedsFsck = 0x04, UfsSuj = 0x08, UfsGjournal = 0x40, UfsMetaCkHash = 0x200;
+
+        private static FsInfo Ufs(byte[] b)
+        {
+            foreach (int o in new[] { 0x10000, 0x2000 })
+            {
+                // UFS2 at 64 KiB; UFS1 (or, from some makefs versions, UFS2) at 8 KiB. A UFS1 magic at 64 KiB is a
+                // backup copy (64 KiB blocks), so it does not count
+                if (!Has(b, o, 1376)) continue;
+                uint le = Le32(b, o + 1372), bem = Be32(b, o + 1372);
+                bool be;
+                uint magic;
+                if (le == UfsMagic2 || (o == 0x2000 && le == UfsMagic1)) { be = false; magic = le; }
+                else if (bem == UfsMagic2 || (o == 0x2000 && bem == UfsMagic1)) { be = true; magic = bem; }
+                else continue;
+                Func<int, uint> u32 = x => be ? Be32(b, o + x) : Le32(b, o + x);
+                Func<int, ulong> u64 = x => be ? Be64(b, o + x) : Le64(b, o + x);
+
+                // the Linux driver's checks: power-of-two sizes, blocks of at least 4 KiB, at most 8 fragments per block
+                uint bsize = u32(48), fsize = u32(52), frag = u32(56);
+                if (!Pow2(bsize) || !Pow2(fsize) || bsize < 4096 || bsize > 65536 || fsize < 512 || fsize > bsize ||
+                    bsize / fsize > 8 || frag != bsize / fsize)
+                {
+                    Log.Debug("UFS magic found but the block sizes are not sane; ignored.");
+                    continue;
+                }
+
+                bool ufs2 = magic == UfsMagic2;
+                byte clean = b[o + 209], oldFlags = b[o + 211];
+                bool newLayout = ufs2 || (oldFlags & UfsFlagsUpdated) != 0;   // FreeBSD 5 and later: fs_flags, fs_volname
+                uint flags = newLayout ? u32(1312) : oldFlags;
+                bool ckHash = newLayout && (flags & UfsMetaCkHash) != 0 && u32(1308) != 0;   // NetBSD uses 0x200 otherwise
+                bool softDep = (flags & UfsSoftDep) != 0;
+                bool journal = softDep && (flags & UfsSuj) != 0;
+                bool gjournal = newLayout && (flags & UfsGjournal) != 0;
+
+                // which ufstype= the kernel needs: it cannot tell the variants apart itself
+                uint time = u32(32);
+                string flavour = ufs2 ? "ufs2"
+                               : be && u32(1336) == unchecked(UfsStateOk - time) ? "sun"
+                               : !be && u32(132) == unchecked(UfsStateOk - time) ? "sunx86"
+                               : "44bsd";
+                bool solaris = flavour == "sun" || flavour == "sunx86";
+
+                double total = (ufs2 ? (double)u64(1080) : u32(36)) * fsize;
+                double free = ((ufs2 ? (double)u64(1016) : u32(196)) * frag + (ufs2 ? (double)u64(1032) : u32(204))) * fsize;
+                uint id0 = u32(144), id1 = u32(148);
+
+                var features = new List<string>();
+                if (be) features.Add("big-endian");
+                if (solaris) features.Add("Solaris");
+                if (journal) features.Add("soft updates + journal");
+                else if (softDep) features.Add("soft updates");
+                if (gjournal) features.Add("gjournal");
+                if (ckHash) features.Add("check hashes");
+
+                var info = new FsInfo
+                {
+                    Kind = FsKind.Ufs,
+                    Label = newLayout && !solaris ? Text(b, o + 680, 32) : string.Empty,
+                    Uuid = id0 != 0 || id1 != 0 ? id0.ToString("x8", CultureInfo.InvariantCulture) + id1.ToString("x8", CultureInfo.InvariantCulture) : string.Empty,
+                    TotalBytes = total,
+                    FreeBytes = free <= total ? free : -1,
+                    Version = (ufs2 ? "UFS2" : "UFS1") + (features.Count > 0 ? ", " + string.Join(", ", features) : string.Empty),
+                    KernelOptions = "ufstype=" + flavour
+                };
+                if (solaris)
+                {
+                    info.ReadOnly = true;
+                    info.Note = "Solaris UFS is mounted read-only.";
+                }
+                else if (clean != 1)
+                {
+                    // FreeBSD and OpenBSD write 0 while mounted, NetBSD 2; the Linux driver takes 2 for clean
+                    info.ReadOnly = true;
+                    info.Note = "This UFS filesystem was not cleanly unmounted, or is still in use on another system, so it is " +
+                                "mounted read-only. Check it on a BSD system first (FreeBSD: fsck_ffs), then eject it there.";
+                }
+                else if ((flags & UfsNeedsFsck) != 0 && newLayout)
+                {
+                    info.ReadOnly = true;
+                    info.Note = "FreeBSD marked this UFS filesystem as needing a check, so it is mounted read-only. Run fsck_ffs on it on FreeBSD.";
+                }
+                else if (gjournal)
+                {
+                    info.ReadOnly = true;
+                    info.Note = "This UFS filesystem uses FreeBSD's gjournal, which Linux cannot replay, so it is mounted read-only.";
+                }
+                if (ufs2 && o != 0x10000)
+                {
+                    info.Note = Join(info.Note, "Its UFS2 superblock is at 8 KiB (older makefs versions put it there); the Linux UFS " +
+                                                "driver only looks at 64 KiB, so it cannot mount it.");
+                }
+                if (fsize > 4096)
+                {
+                    info.Note = Join(info.Note, string.Format(CultureInfo.InvariantCulture,
+                        "Its fragment size is {0} bytes; the Linux UFS driver only mounts fragments of up to 4096 bytes.", fsize));
+                }
+
+                var write = new List<string>();
+                if (ckHash)
+                {
+                    write.Add("Writing switches off FreeBSD's metadata check hashes (Linux does not maintain them). To turn them back " +
+                              "on, run fsck_ffs on the unmounted filesystem on FreeBSD, without -p or -y, and answer yes to the " +
+                              "\"ADD ... CHECK-HASH PROTECTION\" questions.");
+                }
+                if (journal)
+                {
+                    write.Add("If the drive is removed without ejecting it, FreeBSD needs a full fsck_ffs before it mounts it " +
+                              "read/write (the soft updates journal from before this mount is not used).");
+                }
+                if (write.Count > 0) info.WriteNote = string.Join(" ", write);
+                return info;
+            }
+            return null;
+        }
+
+        private static bool Pow2(uint v)
+        {
+            return v != 0 && (v & (v - 1)) == 0;
+        }
     }
 
     /// <summary>CRC-32C (Castagnoli), as used by the btrfs superblock checksum.</summary>
@@ -602,7 +738,7 @@ namespace BtrfsUsbMounter.Core
         private static readonly FsKind[] KernelKinds =
         {
             FsKind.Btrfs, FsKind.Ext2, FsKind.Ext3, FsKind.Ext4, FsKind.Xfs, FsKind.Jfs, FsKind.ReiserFs, FsKind.Reiser4,
-            FsKind.HfsPlus, FsKind.Apfs, FsKind.Zfs
+            FsKind.HfsPlus, FsKind.Apfs, FsKind.Zfs, FsKind.Ufs
         };
 
         private sealed class DistroSupport
@@ -610,6 +746,8 @@ namespace BtrfsUsbMounter.Core
             public readonly HashSet<FsKind> Kernel = new HashSet<FsKind>();
             public bool ApfsFuse;
             public bool ZfsTools;
+            /// <summary>The ufs module was built by tools/build-wsl-modules.sh (write support plus the FreeBSD handoff).</summary>
+            public bool UfsWrite;
         }
 
         /// <summary>
@@ -650,6 +788,16 @@ namespace BtrfsUsbMounter.Core
         }
 
         /// <summary>
+        /// UFS may be written: the ufs module carries the modinfo field wsl_handoff=1, so it has write support and
+        /// keeps fs_clean, check hashes and the journal consistent for FreeBSD (see ufs_handoff in the build script).
+        /// </summary>
+        public bool CanWriteUfs(string distro)
+        {
+            DistroSupport s;
+            return !string.IsNullOrEmpty(distro) && byDistro.TryGetValue(distro, out s) && s.Kernel.Contains(FsKind.Ufs) && s.UfsWrite;
+        }
+
+        /// <summary>
         /// How a kind gets mounted with this distro. APFS: the kernel driver (linux-apfs-rw) when writing is
         /// allowed or FUSE is missing; otherwise fsapfsmount, which is read-only but shows every volume.
         /// </summary>
@@ -678,7 +826,8 @@ namespace BtrfsUsbMounter.Core
         /// <summary>
         /// Asks the distro (as root) which filesystems the kernel can provide, without loading anything:
         /// registered in /proc/filesystems, or a module modinfo can find (shipped, or built by
-        /// tools/build-wsl-modules.sh). Also checks for fsapfsmount and zpool. One short wsl.exe call.
+        /// tools/build-wsl-modules.sh). Also checks for fsapfsmount and zpool, and whether the ufs module is the
+        /// locally built one that may write. One short wsl.exe call.
         /// </summary>
         public async Task RefreshAsync(string distro, CancellationToken ct)
         {
@@ -688,7 +837,8 @@ namespace BtrfsUsbMounter.Core
                 "for t in " + kinds + "; do " +
                 "if grep -qw \"$t\" /proc/filesystems || modinfo -n \"$t\" >/dev/null 2>&1; then echo \"k:$t=yes\"; else echo \"k:$t=no\"; fi; done; " +
                 "if command -v fsapfsmount >/dev/null 2>&1 && grep -qw fuse /proc/filesystems; then echo t:fsapfsmount=yes; else echo t:fsapfsmount=no; fi; " +
-                "if command -v zpool >/dev/null 2>&1; then echo t:zpool=yes; else echo t:zpool=no; fi";
+                "if command -v zpool >/dev/null 2>&1; then echo t:zpool=yes; else echo t:zpool=no; fi; " +
+                "if modinfo -F wsl_handoff ufs 2>/dev/null | grep -qx 1; then echo t:ufswrite=yes; else echo t:ufswrite=no; fi";
             WslResult r = await Wsl.RunRootAsync(distro, script, 60, ct).ConfigureAwait(false);
             if (r.ExitCode != 0)
             {
@@ -708,11 +858,13 @@ namespace BtrfsUsbMounter.Core
                 }
                 else if (t.StartsWith("t:fsapfsmount=", StringComparison.Ordinal)) s.ApfsFuse = yes;
                 else if (t.StartsWith("t:zpool=", StringComparison.Ordinal)) s.ZfsTools = yes;
+                else if (t.StartsWith("t:ufswrite=", StringComparison.Ordinal)) s.UfsWrite = yes;
                 else if (t == "r:restored") Log.Debug("Restored the locally built drivers in " + distro + " after a WSL restart.");
             }
             byDistro[distro] = s;
             Log.Debug("Filesystem support in " + distro + ": kernel drivers " + string.Join(", ", s.Kernel.Select(FsTypes.DisplayName)) +
-                      "; fsapfsmount " + (s.ApfsFuse ? "yes" : "no") + "; zpool " + (s.ZfsTools ? "yes" : "no"));
+                      "; fsapfsmount " + (s.ApfsFuse ? "yes" : "no") + "; zpool " + (s.ZfsTools ? "yes" : "no") +
+                      "; UFS writable " + (s.UfsWrite ? "yes" : "no"));
         }
 
         public async Task EnsureAsync(string distro, CancellationToken ct)

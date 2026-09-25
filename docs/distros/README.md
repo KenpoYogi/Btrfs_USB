@@ -10,7 +10,7 @@ developed on. The extra drivers from **Tools > Build filesystem drivers** are te
 and on [Kali](kali.md). The build works with zypper (openSUSE, SLES) and apt (Debian, Kali, Ubuntu);
 on Leap, SLES, Debian and Ubuntu it is expected to work but not tested yet.
 
-| Distro | Guide | btrfs, ext, XFS | Mac (APFS) read-only | Extra drivers (JFS, HFS+, ZFS, APFS read/write) |
+| Distro | Guide | btrfs, ext, XFS | Mac (APFS) read-only | Extra drivers (JFS, HFS+, UFS, ZFS, APFS read/write) |
 |---|---|---|---|---|
 | openSUSE Tumbleweed | [opensuse-tumbleweed.md](opensuse-tumbleweed.md) | Yes (tested) | Yes | Yes |
 | openSUSE Leap 16.0 | [opensuse-leap.md](opensuse-leap.md) | Yes | Yes | Should work (not tested) |
@@ -26,11 +26,15 @@ on Leap, SLES, Debian and Ubuntu it is expected to work but not tested yet.
 ReiserFS and Reiser4 drives are detected on every distro but can't be opened: Linux 6.13 removed
 ReiserFS, and current WSL kernels are newer than that.
 
+UFS drives from FreeBSD, NetBSD and OpenBSD open wherever the extra drivers can be built: read-only,
+or read/write after **Tools > Allow UFS writes** (experimental; see the [README](../../README.md#ufs)).
+
 ## What was checked
 
-- **openSUSE Tumbleweed**: tested with the app.
-- **Kali**: the driver build and the drivers are tested (disk-image tests for JFS, APFS, ZFS; HFS+
-  load only); the app itself was run on Tumbleweed.
+- **openSUSE Tumbleweed**: tested with the app. UFS: disk images made by FreeBSD 15.1, written by the
+  built driver, then checked by FreeBSD's `fsck_ffs` (the app itself has not mounted a real UFS disk yet).
+- **Kali**: the driver build and the drivers are tested (disk-image tests for JFS, APFS, ZFS and UFS;
+  HFS+ load only); the app itself was run on Tumbleweed.
 - **All other distros**: package names and availability were checked against each distro's official
   package repositories in September 2026, but the app itself was not run on them. If something in a
   guide doesn't match what you see, please report it together with `mounter.log`.

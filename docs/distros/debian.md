@@ -8,6 +8,7 @@ Debian is a stable, conservative distro. It handles btrfs, ext and XFS drives, a
 | btrfs, ext2/3/4, XFS | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs-utils` (not on Debian testing/unstable, see below) |
 | JFS, HFS+ (Mac), ZFS, APFS read/write | Should work, not tested: **Tools > Build filesystem drivers** (tested on Kali, which is Debian-based) |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: after **Tools > Build filesystem drivers**, read-only, or read/write with **Tools > Allow UFS writes** (experimental) |
 | ReiserFS, Reiser4 | No (detected only) |
 
 **ZFS and APFS driver packages.** Debian has them (checked September 2026; trixie: ZFS 2.3.9 in
@@ -20,7 +21,7 @@ so installing `zfs-dkms` or `apfs-dkms` builds nothing WSL can load. `zfsutils-l
 **Tools > Build filesystem drivers** builds these drivers against the WSL kernel's own source instead,
 with apt and Debian's `gcc-13`. It is tested on Kali (Debian-based) and should work on Debian 13
 the same way. For ZFS it installs `zfsutils-linux`, which is in Debian's *contrib* section: turn
-*contrib* on first (see [Extra drivers](#optional-extra-drivers-jfs-hfs-zfs-apfs)). If the build
+*contrib* on first (see [Extra drivers](#optional-extra-drivers-jfs-hfs-ufs-zfs-apfs)). If the build
 fails on Debian, please report it with `mounter.log`; [Kali](kali.md) or
 [openSUSE Tumbleweed](opensuse-tumbleweed.md) next to Debian are tested alternatives.
 
@@ -112,7 +113,7 @@ The build there (20240429-2) has no FUSE support, so `fsapfsmount` can't mount a
 September 2026: that package depends on no FUSE library, while the trixie one uses libfuse2). If you
 have Debian 12 ("bookworm"), `libfsapfs-utils` is not verified with this app.
 
-### Optional: extra drivers (JFS, HFS+, ZFS, APFS)
+### Optional: extra drivers (JFS, HFS+, UFS, ZFS, APFS)
 
 The WSL kernel from Microsoft has no drivers for these, so Btrfs USB Mounter compiles them with
 Debian's `gcc-13` and the WSL kernel's source code. **Tested on Kali, not yet on Debian itself.**
@@ -136,6 +137,11 @@ Debian's `gcc-13` and the WSL kernel's source code. **Tested on Kali, not yet on
 
 The drivers survive WSL and Windows restarts (the app puts them back when needed). **Run the build
 again after every `wsl --update`**: a new WSL kernel needs its own build.
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool (Debian dropped `ufsutils`): check UFS drives
+with `fsck_ffs` on FreeBSD.
 
 Type `exit` to leave the root shell.
 
@@ -174,7 +180,8 @@ To test from the command line, open an administrator terminal in the program fol
 | Mac drive fails with "No sub system to mount APFS format" | Your `libfsapfs-utils` lacks FUSE (testing/unstable): `apt remove -y libfsapfs-utils`, then build the APFS driver (**Tools > Build filesystem drivers**) and click **Refresh** |
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `apt install -y libfsapfs-utils` (Debian 13), or build the drivers. ZFS: turn on *contrib*, then **Tools > Build filesystem drivers**. Then click **Refresh** |
-| Status says *No driver* | Run **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-zfs-apfs)) |
+| Status says *No driver* | Run **Tools > Build filesystem drivers** (see [Extra drivers](#optional-extra-drivers-jfs-hfs-ufs-zfs-apfs)) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | `apt install zfs-dkms` or `apfs-dkms` builds no driver, or a guide asks for `linux-headers-$(uname -r)` | Expected in WSL: there are no headers for the WSL kernel, so DKMS builds nothing and the headers package doesn't exist. `apt remove zfs-dkms apfs-dkms`, then use **Tools > Build filesystem drivers** |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

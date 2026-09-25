@@ -2,9 +2,9 @@
 
 Standalone Windows desktop tool (NOT a Cimatron plugin; no Cimatron/ACIS references).
 Mounts Linux/Mac-formatted USB drives through WSL2 (`wsl --mount --type <fs>`): btrfs, ext2/3/4 and
-XFS read/write with the stock kernel; JFS, ReiserFS (kernels before 6.13), HFS+, ZFS and APFS (rw experimental) with
-modules built by tools/build-wsl-modules.sh; APFS read-only via fsapfsmount (FUSE) otherwise;
-Reiser4 detect-only. It started as a btrfs tool because the
+XFS read/write with the stock kernel; JFS, ReiserFS (kernels before 6.13), HFS+, ZFS, APFS (rw experimental) and
+UFS1/UFS2 (ro, rw experimental) with modules built by tools/build-wsl-modules.sh; APFS read-only via fsapfsmount
+(FUSE) otherwise; Reiser4 detect-only. It started as a btrfs tool because the
 WinBtrfs driver is blocked by the Windows "Cross Certificates for Code Integrity Exceptions"
 policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 
@@ -49,9 +49,23 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   btrfs crc32c checked, libblkid-style sanity checks for ReiserFS and ZFS); `FsSupport` asks the
   distro at runtime which kinds the kernel has (`/proc/filesystems`, `modinfo`) and if fsapfsmount/zpool exist
 - `MountEntry.FsType` missing = btrfs (older and PowerShell-written state.json)
-- Scrub, drive info, offline check are btrfs-only; the Mount options box is btrfs-only
+- Scrub, drive info, offline check are btrfs-only; the Mount options box is btrfs-only (UFS gets its own
+  ufstype option from the probe)
 - Mount methods (`MountEntry.MountMethod`): kernel (`wsl --mount --type`), fuse (APFS via
   fsapfsmount), zfs (`--bare` + `zpool import -R /mnt/wsl <guid>`, never `-f`; eject = `zpool export`)
+- After a kernel mount asked for rw, /proc/mounts is checked: a driver that fell back to ro (UFS/ext4 needing
+  fsck) is recorded as read-only, so eject skips the flush
+- UFS: kernel method with `--options [ro,]ufstype=X`; the probe picks X (ufs2 / 44bsd; sun, sunx86 = Solaris,
+  always ro). wsl --mount's option parser (WSL src/linux/mountutil) turns "ro" into MS_RDONLY. Read-only unless
+  Settings.UfsWrite (Tools > Allow UFS writes) AND the ufs module has `modinfo -F wsl_handoff` = 1. fs_clean != 1,
+  FS_NEEDSFSCK, gjournal: ro with a note. FsInfo.KernelOptions / WriteNote carry ufstype and the rw caveats
+- UFS handoff patch (`ufs_handoff` in the build script, applied to a COPY of fs/ufs at 7 anchor lines that match
+  in 6.6 and 6.18; if any is missing it builds read-only instead): rw mount sets fs_clean 0 on disk (stock Linux
+  leaves 1, so FreeBSD would skip fsck after a crash), clean unmount sets 1; clears FS_METACKHASH when
+  fs_metackhash != 0 (FreeBSD then disables its check hashes; else EINTEGRITY after the first write); with
+  SU+J sets fs_mtime, so fsck_ffs never replays the old journal (it requires journal di_modrev == fs_mtime);
+  refuses rw unless fs_clean == 1 (NetBSD writes 2 while mounted, stock Linux accepts 2); errors write 0 not 0xff
+  (the BSDs treat any non-zero as clean). FreeBSD fields live in Linux's fs_44.fs_sparecon[23/48/49]
 - Locally built modules: WSL mounts /lib/modules/<release> as an overlay whose upper layer is NOT on
   the distro disk (it is in the VM, lost on every WSL restart; the 6.6 modules vanished that way, not
   because of wsl --update). The script keeps them in /var/lib/wsl-modules/<release> and installs a
@@ -97,6 +111,19 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   only (no mkfs.hfsplus in Tumbleweed); ZFS create/export, import by GUID -R /mnt/wsl, write, scrub,
   export. Restore after a simulated restart (extra deleted, modules unloaded): detected + loaded.
   NOT tested: the app itself (wsl --mount needs an elevated shell), real USB disks, a real wsl --shutdown
+- UFS verified on 6.18.33.2 in Tumbleweed (2026-09-25) against real FreeBSD: FreeBSD 15.1 BASIC-CI image in
+  QEMU/KVM inside WSL (/var/tmp/fbsdvm, driven by expect over the serial console, root disk snapshot=on).
+  `newfs -U -j` UFS2 (SU+J, check hashes superblock/cg/inodes) and `newfs -O1 -U` UFS1 -> Linux ro + rw
+  (100 MB file, 1500 small files, deletes, renames, symlinks incl. 200 chars, hard links, chown/chmod,
+  remount ro/rw) -> FreeBSD fsck_ffs -n clean, all 3161/3160 sha256 match, FreeBSD writes after, fsck clean.
+  On disk: fs_clean 0 while rw, 1 after umount/remount-ro; flags 0x20a -> 0x0a. A copy taken while rw-mounted:
+  FreeBSD refuses rw ("not clean - run fsck"), fsck -p says "Journal timestamp does not match", full check,
+  exit 0. Interactive fsck_ffs re-adds check hashes. fs_clean 0 and 2 images: rw request -> ro. Patch applies
+  and compiles on 6.6 too. FreeBSD fsck asks "UPDATE FILESYSTEM TO TRACK DIRECTORY DEPTH" for Linux-made
+  dirs (harmless). Kali (apt build, own module): NetBSD makefs UFS1 image ro + rw (incl. ENOSPC: makefs sizes
+  inodes to the content) -> FreeBSD fsck clean, 1386 sums match. Debian's makefs (20190105) puts UFS2 at 8 KiB:
+  neither Linux nor FreeBSD reads it (probe notes it). NOT tested: real NetBSD/OpenBSD/Solaris media, big-endian
+  UFS, the app mounting a real UFS disk
 - Verified on Kali 2026.2 (2026-09-24, same kernel): full apt build (script installed zfsutils-linux
   2.4.4 without zfs-dkms), 3 probes pinned, CRCs match, all 6 modules load; the same loop-device
   tests pass (fsapfsmount skipped); restore after a simulated restart with ALL built modules unloaded
@@ -105,7 +132,10 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   APFS kernel ro by default, readwrite + fsck.apfs clean; ZFS pool on a loop device: import by GUID
   under /mnt/wsl, zfs get, export; real-pool ZFS detection matches blkid. HFS+/ReiserFS: load only
 - Test fixtures are made with mkfs in WSL (e2fsprogs, xfsprogs, jfsutils, apfsprogs, btrfsprogs
-  installed in the distro) and cross-checked with `blkid -p`
+  installed in the distro) and cross-checked with `blkid -p`. UFS fixtures: no Linux mkfs/fsck for UFS
+  (Debian dropped ufsutils after wheezy); make them with newfs in the FreeBSD VM (qemu-x86 + expect installed
+  in Tumbleweed) and check them with fsck_ffs there. Test scripts must restore built modules first (WSL
+  idle-restarts between calls and /lib/modules/<rel>/extra is then empty)
 
 ## Logging
 - `Log.Debug` = troubleshooting detail: always in mounter.log, hidden on screen unless Tools >

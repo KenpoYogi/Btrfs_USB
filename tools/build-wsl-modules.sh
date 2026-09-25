@@ -12,13 +12,14 @@
 # them. Run as root inside the WSL distro: openSUSE or SLES (zypper), or Debian, Kali or Ubuntu (apt).
 # Tested on openSUSE Tumbleweed and Kali.
 #
-#   sh build-wsl-modules.sh [jfs] [reiserfs] [hfsplus] [zfs] [apfs]    (no arguments = all)
+#   sh build-wsl-modules.sh [jfs] [reiserfs] [hfsplus] [ufs] [zfs] [apfs]    (no arguments = all)
 #
 # Rerun after "wsl --update": a new WSL kernel needs modules built against its own source.
 # Built from:
-#   - in-tree drivers (JFS, HFS+, HFS, and ReiserFS on kernels before 6.13, which removed it) from
+#   - in-tree drivers (JFS, HFS+, HFS, UFS, and ReiserFS on kernels before 6.13, which removed it) from
 #     github.com/microsoft/WSL2-Linux-Kernel at the tag matching uname -r, configured with the
-#     running kernel's own /proc/config.gz
+#     running kernel's own /proc/config.gz. UFS gets write support and a small change (ufs_handoff
+#     below) so that FreeBSD notices when Linux wrote to the filesystem
 #   - OpenZFS (github.com/openzfs/zfs), same version as the installed zfs userspace package
 #   - linux-apfs-rw (github.com/linux-apfs/linux-apfs-rw); its write support is experimental
 set -eu
@@ -33,7 +34,7 @@ DEST=/lib/modules/$KVER/extra
 # Mounter copies them back into DEST (plus depmod) when they are missing.
 STORE=/var/lib/wsl-modules/$KVER
 JOBS=$(nproc)
-WANT=${*:-jfs reiserfs hfsplus zfs apfs}
+WANT=${*:-jfs reiserfs hfsplus ufs zfs apfs}
 
 log() { printf '\n==== %s\n' "$*"; }
 want() { case " $WANT " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
@@ -55,6 +56,111 @@ pin_kconfig() {
         /^(choice|endchoice|menu|endmenu|if|endif|source|comment)([ \t]|$)/ { blk = 0 }
         blk && /^[ \t]+(def_bool|default|depends on|bool[ \t]*$)/ { next }
         { print }' "$f" > "$f.pin" && mv "$f.pin" "$f"
+}
+
+# ufs_handoff DIR: changes a copy of fs/ufs so that read/write mounts hand the filesystem back to the BSDs
+# the way FreeBSD expects from a kernel that does not know its newer features:
+#   - while mounted read/write, fs_clean is 0 on disk, as FreeBSD does itself. Linux leaves it at 1, so after
+#     a crash or an unplugged drive FreeBSD would take the filesystem for clean and skip fsck. A clean
+#     unmount sets it back to 1; an error leaves 0 (the BSDs treat Linux's "bad" value 0xff as clean).
+#     Only fs_clean 1 allows a read/write mount: Linux also takes 2 as clean, which NetBSD writes while mounted.
+#   - metadata check hashes (FreeBSD 12+ newfs default) are switched off by clearing FS_METACKHASH: Linux
+#     does not update them, and FreeBSD disables them on its next mount when that flag is gone (fsck_ffs can
+#     add them back). Otherwise FreeBSD rejects the superblock after the first write.
+#   - with journaled soft updates, fs_mtime is set to the mount time, so fsck_ffs never replays a journal
+#     left by an earlier FreeBSD mount over the changes made here (it only uses a journal whose time
+#     matches fs_mtime), and does a full check instead.
+# Only for the 4.4BSD flavours (ufstype=44bsd and ufs2); Solaris flavours are left alone. The module gets
+# modinfo field wsl_handoff=1, which Btrfs USB Mounter requires before it mounts UFS read/write.
+ufs_handoff() {
+    cat > "$1/wsl-handoff.h" <<'EOF'
+/* Added by tools/build-wsl-modules.sh (Btrfs USB Mounter): see ufs_handoff there */
+#define WSL_FS_DOSOFTDEP	0x00000002
+#define WSL_FS_SUJ		0x00000008
+#define WSL_FS_FLAGS_UPDATED	0x80		/* in the old 8-bit flags: 32-bit fs_flags in use */
+#define WSL_FS_METACKHASH	0x00000200
+/* FreeBSD struct fs fields that sit in Linux's fs_44.fs_sparecon[] */
+#define WSL_SPARE_MTIME		23		/* fs_mtime, 64 bits (offset 1208) */
+#define WSL_SPARE_METACKHASH	48		/* fs_metackhash (1308) */
+#define WSL_SPARE_FLAGS		49		/* fs_flags (1312) */
+
+static bool ufs_wsl_bsd(struct super_block *sb)
+{
+	return (UFS_SB(sb)->s_flags & UFS_ST_MASK) == UFS_ST_44BSD;
+}
+
+static __s8 ufs_wsl_bad_state(struct super_block *sb)
+{
+	return ufs_wsl_bsd(sb) ? 0 : UFS_FSBAD;
+}
+
+/*
+ * Linux also accepts fs_clean 2 (Solaris "stable") as clean, but NetBSD writes 2 while it has the
+ * filesystem mounted read/write, so for the BSDs only 1 is clean.
+ */
+static void ufs_wsl_check_clean(struct super_block *sb)
+{
+	struct ufs_super_block_first *usb1 = ubh_get_usb_first(UFS_SB(sb)->s_uspi);
+
+	if (ufs_wsl_bsd(sb) && !sb_rdonly(sb) && usb1->fs_clean != UFS_FSCLEAN) {
+		pr_err("%s: not cleanly unmounted (fs_clean %d), mounting read-only; run fsck on BSD\n",
+		       sb->s_id, usb1->fs_clean);
+		sb->s_flags |= SB_RDONLY;
+	}
+}
+
+static void ufs_wsl_mark_in_use(struct super_block *sb)
+{
+	struct ufs_sb_private_info *uspi = UFS_SB(sb)->s_uspi;
+	struct ufs_super_block_first *usb1 = ubh_get_usb_first(uspi);
+	struct ufs_super_block_third *usb3 = ubh_get_usb_third(uspi);
+	__fs32 *spare = usb3->fs_un2.fs_44.fs_sparecon;
+	u32 flags;
+
+	if (!ufs_wsl_bsd(sb))
+		return;
+	if (uspi->fs_magic == UFS2_MAGIC || (usb1->fs_flags & WSL_FS_FLAGS_UPDATED)) {
+		flags = fs32_to_cpu(sb, spare[WSL_SPARE_FLAGS]);
+		/* NetBSD uses this flag bit for something else, but never sets fs_metackhash */
+		if (spare[WSL_SPARE_METACKHASH] && (flags & WSL_FS_METACKHASH)) {
+			flags &= ~WSL_FS_METACKHASH;
+			spare[WSL_SPARE_FLAGS] = cpu_to_fs32(sb, flags);
+			pr_info("%s: metadata check hashes switched off (fsck_ffs on FreeBSD can add them back)\n",
+				sb->s_id);
+		}
+		if ((flags & (WSL_FS_SUJ | WSL_FS_DOSOFTDEP)) == (WSL_FS_SUJ | WSL_FS_DOSOFTDEP)) {
+			__fs64 now = cpu_to_fs64(sb, ktime_get_real_seconds());
+
+			memcpy(&spare[WSL_SPARE_MTIME], &now, sizeof(now));
+		}
+	}
+	usb1->fs_clean = 0;
+	ubh_mark_buffer_dirty(USPI_UBH(uspi));
+	ubh_sync_block(USPI_UBH(uspi));
+}
+
+static void ufs_wsl_mark_clean(struct super_block *sb)
+{
+	struct ufs_super_block_first *usb1 = ubh_get_usb_first(UFS_SB(sb)->s_uspi);
+
+	if (ufs_wsl_bsd(sb) && usb1->fs_clean == 0)
+		usb1->fs_clean = UFS_FSCLEAN;
+}
+EOF
+    # every change goes at a line that is the same in the 6.6 and 6.18 trees; fail unless all seven match
+    awk '
+        /^static const struct super_operations ufs_super_ops;$/ { print; print "#include \"wsl-handoff.h\""; n++; next }
+        /^\tsb->s_op = &ufs_super_ops;$/ { print "\tufs_wsl_check_clean(sb);"; n++ }
+        /usb1->fs_clean = UFS_FSBAD;/ { sub(/UFS_FSBAD/, "ufs_wsl_bad_state(sb)"); n++ }
+        /^static void ufs_put_super_internal\(/ { psi = 1 }
+        psi && /^\tufs_put_cstotal\(sb\);$/ { print "\tufs_wsl_mark_clean(sb);"; psi = 0; n++ }
+        /^\t\tsb->s_flags &= ~SB_RDONLY;$/ { print; print "\t\tufs_wsl_mark_in_use(sb);"; n++; next }
+        /^\t\tif \(!ufs_read_cylinder_structures\(sb\)\)$/ { cyl = 1; print; next }
+        cyl && /^\t\t\tgoto failed;$/ { print; print "\tif (!sb_rdonly(sb))"; print "\t\tufs_wsl_mark_in_use(sb);"; cyl = 0; n++; next }
+        { cyl = 0; print }
+        END { exit n == 7 ? 0 : 1 }' "$1/super.c" > "$1/super.c.new" || return 1
+    mv "$1/super.c.new" "$1/super.c"
+    printf '\nMODULE_INFO(wsl_handoff, "1");\n' >> "$1/super.c"
 }
 
 [ "$(id -u)" = 0 ] || { echo "Run as root (wsl -u root)."; exit 1; }
@@ -140,7 +246,7 @@ if [ ! -f "$KSRC/Makefile" ]; then
     rm -f "linux-msft-wsl-$BASE.tar.gz"
 fi
 cd "$KSRC"
-STAMP="$CC_BIN keep-btf pin-probes"
+STAMP="$CC_BIN keep-btf pin-probes ufs"
 if [ ! -f vmlinux.symvers ] || ! cmp -s /proc/config.gz .running-config.gz || [ "$(cat .built-with 2>/dev/null)" != "$STAMP" ]; then
     log "Configuring from /proc/config.gz"
     zcat /proc/config.gz > .config
@@ -150,6 +256,7 @@ if [ ! -f vmlinux.symvers ] || ! cmp -s /proc/config.gz .running-config.gz || [ 
                    --module REISERFS_FS --enable REISERFS_FS_XATTR --enable REISERFS_FS_POSIX_ACL \
                    --enable REISERFS_FS_SECURITY \
                    --module HFSPLUS_FS --module HFS_FS \
+                   --module UFS_FS --enable UFS_FS_WRITE \
                    --disable LOCALVERSION_AUTO
     # Everything else stays exactly as Microsoft configured it, debug info and BTF included:
     # DEBUG_INFO_BTF_MODULES adds fields to struct module, so turning BTF off changes the module ABI.
@@ -216,6 +323,25 @@ for fs in jfs reiserfs hfsplus; do
         cp "$d"/*.ko "$STORE"/
     done
 done
+
+# ---- UFS (FreeBSD, NetBSD, OpenBSD; Solaris read-only) -------------------------------------------
+if want ufs; then
+    # built from a copy, so the kernel tree stays as downloaded
+    UFS=$WORK/ufs
+    rm -rf "$UFS"
+    cp -r fs/ufs "$UFS"
+    if ufs_handoff "$UFS"; then
+        log "Building fs/ufs with write support"
+    else
+        # without the handoff changes, writing could leave a FreeBSD filesystem that FreeBSD rejects
+        log "Building fs/ufs read-only: this kernel's fs/ufs/super.c differs from what ufs_handoff expects"
+        rm -rf "$UFS"
+        cp -r fs/ufs "$UFS"
+        sed -i '1i #undef CONFIG_UFS_FS_WRITE' "$UFS/super.c"
+    fi
+    make -s -j"$JOBS" CC="$CC_BIN" HOSTCC="$CC_BIN" HOSTCFLAGS="$HOSTFIX" M="$UFS" modules
+    cp "$UFS/ufs.ko" "$STORE"/
+fi
 
 # ---- OpenZFS ----------------------------------------------------------------------------------
 if want zfs; then
@@ -291,5 +417,5 @@ status=0
 for m in $(ls "$DEST" | sed 's/\.ko$//'); do
     if modprobe "$m"; then echo "  $m: loaded"; else echo "  $m: FAILED"; status=1; fi
 done
-grep -wE 'jfs|reiserfs|hfsplus|hfs|zfs|apfs' /proc/filesystems || true
+grep -wE 'jfs|reiserfs|hfsplus|hfs|ufs|zfs|apfs' /proc/filesystems || true
 exit $status

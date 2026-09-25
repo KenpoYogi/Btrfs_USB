@@ -242,7 +242,7 @@ namespace BtrfsUsbMounter
             "  (no options)       open the window\r\n" +
             "  --tray             start hidden in the system tray\r\n" +
             "  --list             list detected filesystems (btrfs, ext2/3/4, XFS, JFS, ReiserFS,\r\n" +
-            "                     Reiser4, ZFS, HFS+, APFS) and whether they can be mounted\r\n" +
+            "                     Reiser4, ZFS, HFS+, APFS, UFS) and whether they can be mounted\r\n" +
             "  --mount-all        mount every detected, unmounted filesystem that can be mounted\r\n" +
             "  --unmount-all      flush and detach everything this program mounted\r\n" +
             "  --distro <name>    WSL2 distribution to use\r\n" +

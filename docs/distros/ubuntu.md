@@ -15,10 +15,11 @@ Ubuntu is the most common WSL distro and a good choice for btrfs, ext and XFS dr
 | btrfs, ext2/3/4, XFS | Yes, read/write | Yes, read/write |
 | APFS (Mac drives), read-only | Yes, with `libfsapfs-utils` | Only with the built APFS driver (package lacks FUSE) |
 | JFS, HFS+ (Mac), APFS read/write | Should work, not tested (see below) | Should work, not tested |
+| UFS1, UFS2 (FreeBSD, NetBSD, OpenBSD) | Should work, not tested: read-only, or read/write with **Tools > Allow UFS writes** (experimental) | Should work, not tested |
 | ZFS | No: Ubuntu's ZFS 2.2.2 is too old for the WSL kernel | Should work, not tested |
 | ReiserFS, Reiser4 | No (detected only) | No |
 
-**Extra drivers.** **Tools > Build filesystem drivers** compiles JFS, HFS+, ZFS and APFS drivers for
+**Extra drivers.** **Tools > Build filesystem drivers** compiles JFS, HFS+, UFS, ZFS and APFS drivers for
 the WSL kernel with apt and Ubuntu's `gcc-13`. It is tested on Kali (Debian-based, same apt route),
 not yet on Ubuntu. For ZFS it builds the OpenZFS version of Ubuntu's `zfsutils-linux`: 2.4.1 on 26.04
 works with the current WSL kernel (6.18), but 2.2.2 on 24.04 only supports Linux up to 6.6, so on
@@ -27,6 +28,10 @@ don't help: DKMS compiles the driver against the headers of the running kernel, 
 kernel has no headers package. If the build fails on Ubuntu, please report it with `mounter.log`;
 [Kali](kali.md) or [openSUSE Tumbleweed](opensuse-tumbleweed.md) next to Ubuntu are tested
 alternatives.
+
+**UFS drives** (FreeBSD, NetBSD, OpenBSD) open read-only with the built driver. To write to them, tick
+**Tools > Allow UFS writes (experimental)**; the [README](../../README.md#ufs) explains what that
+changes on FreeBSD drives. Linux has no UFS check tool: check UFS drives with `fsck_ffs` on FreeBSD.
 
 This guide uses **`Ubuntu-24.04`**. For another version, replace the name everywhere.
 
@@ -145,6 +150,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Drive info, scrub or check say the btrfs tools are missing | Repeat Step 3, or click **Yes** when the app offers to install `btrfs-progs` |
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: on 24.04 `apt install -y libfsapfs-utils`, then click **Refresh**; on 26.04 build the APFS driver. ZFS: **Tools > Build filesystem drivers** (26.04; on 24.04 use Kali or openSUSE Tumbleweed) |
 | Status says *No driver* | Run **Tools > Build filesystem drivers** in the app (again after a `wsl --update`) |
+| A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
 | `apt install zfs-dkms` or `apfs-dkms` builds no driver, or a guide asks for `linux-headers-$(uname -r)` | Expected in WSL: there are no headers for the WSL kernel, so DKMS builds nothing and the headers package doesn't exist. `apt remove zfs-dkms apfs-dkms`, then use **Tools > Build filesystem drivers** |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

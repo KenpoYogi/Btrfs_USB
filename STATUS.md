@@ -8,7 +8,27 @@
 
 ---
 
-## ⭐ (this commit) — **THE SPLITTER CAN BE SEEN, AND THE LOG STARTS BIG: THE UPPER PANE AT HALF ITS OLD HEIGHT.** _2026-09-24. Evidence: the user ran `a0d162d` at 16:26 — the log shows X → tray (16:27:00, `exit requested False`) and Close → exit (16:27:03, `True`) working — but `state.json` kept `LogHeight: 0`: the splitter was never dragged. It was an unmarked 6 px strip in the window colour. User: "vertically resize the upper and lower panes; the upper pane initially 50% smaller, the lower gets the extra space". `dotnet build -c Release`: succeeded. **Not yet run.**_
+## ⭐ (this commit) — **UFS1 / UFS2 (FREEBSD, NETBSD, OPENBSD): DETECTED, MOUNTED READ-ONLY, READ/WRITE OPT-IN WITH A PATCHED DRIVER THAT FREEBSD ACCEPTS.** _2026-09-25. Evidence: user request ("add UFS and UFS2 support", then "read/write if possible, and update all the distro docs"). Driver built on 6.18.33.2 in Tumbleweed and Kali (CRCs match, 7 modules load, `wsl_handoff=1`); patch applies and compiles on the 6.6 tree too. **FreeBSD 15.1 in QEMU/KVM inside WSL:** `newfs -U -j` UFS2 (SU+J + check hashes) and `newfs -O1 -U` UFS1 → Linux ro and rw writes → FreeBSD `fsck_ffs -n` clean, 3161 / 3160 checksums match, FreeBSD writes after, clean; crash copy (taken while rw-mounted) refused rw by FreeBSD, `fsck -p` skips the stale journal and does a full check. Kali: NetBSD `makefs` UFS1 written (incl. ENOSPC) → FreeBSD fsck clean, 1386 checksums match. Probe run on 8 real superblocks (FreeBSD, makefs, crafted unclean). `dotnet build -c Release`: 0 warnings. **The app itself has not mounted a UFS disk** (wsl --mount needs an elevated shell)._
+
+- **Probe** (`FsProbe.Ufs`): UFS2 at 64 KiB, UFS1 (or makefs UFS2, not mountable, noted) at 8 KiB, either byte order;
+  label (fs_volname, new layout only), UUID as blkid (`%08x%08x` of fs_id), size and free space; picks `ufstype`
+  (ufs2, 44bsd; sun / sunx86 by the Solaris state stamp, read-only). fs_clean != 1, FS_NEEDSFSCK, gjournal → read-only
+  with a note; `WriteNote` for check hashes / SU+J.
+- **Mount:** kernel method, `--options [ro,]ufstype=X`. Read/write only with **Tools > Allow UFS writes (experimental)**
+  (`AppSettings.UfsWrite`) and a `ufs` module with `modinfo -F wsl_handoff` = 1 (`FsSupport.CanWriteUfs`). New for every
+  kernel mount asked rw: `/proc/mounts` is checked and a driver's ro fallback is recorded (no flush on eject).
+- **Build script:** `ufs` in the default set, `UFS_FS=m` + `UFS_FS_WRITE=y` (stamp `... ufs` → one reconfigure),
+  `ufs_handoff` patches a copy of fs/ufs: fs_clean 0 while rw, 1 on clean unmount, 0 (not 0xff) on error; clears
+  FS_METACKHASH; sets fs_mtime with SU+J; rw only when fs_clean == 1. Falls back to a read-only build if an anchor moves.
+- **Docs:** README (table, build steps, UFS section), all 10 distro guides (tables, driver sections, troubleshooting;
+  Debian/Kali anchors renamed), CLAUDE.md.
+- **Files.** `src/Core/FileSystems.cs`, `src/Core/MountManager.cs`, `src/Core/Models.cs`, `src/Core/StateStore.cs`,
+  `src/UI/MainForm.cs`, `src/Program.cs`, `tools/build-wsl-modules.sh`, `README.md`, `docs/distros/*.md`, `CLAUDE.md`,
+  `RESUME.md`, this file.
+
+---
+
+## ⭐ 369d3ff — **THE SPLITTER CAN BE SEEN, AND THE LOG STARTS BIG: THE UPPER PANE AT HALF ITS OLD HEIGHT.** _2026-09-24. Evidence: the user ran `a0d162d` at 16:26 — the log shows X → tray (16:27:00, `exit requested False`) and Close → exit (16:27:03, `True`) working — but `state.json` kept `LogHeight: 0`: the splitter was never dragged. It was an unmarked 6 px strip in the window colour. User: "vertically resize the upper and lower panes; the upper pane initially 50% smaller, the lower gets the extra space". `dotnet build -c Release`: succeeded. **Not yet run.**_
 
 - **Visible splitter:** 8 px (96 dpi), a line along each edge and nine grip dots in the middle (`OnPaintSplitter`,
   repainted on move and resize); tooltip "Drag to resize the drive list and the log." over the bar.
