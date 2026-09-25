@@ -391,7 +391,8 @@ namespace LinuxUsbMounter
             List<VolumeInfo> volumes = scan.Volumes;
             int exitCode = 0;
 
-            if (distro != null)
+            // the support check boots the WSL VM: skip it when no drive could be mounted anyway
+            if (distro != null && volumes.Any(v => !v.Mounted && !v.Disconnected))
             {
                 try { await engine.Support.EnsureAsync(distro, ct).ConfigureAwait(false); }
                 catch (Exception ex) { Log.DebugException("Filesystem support check failed", ex); }

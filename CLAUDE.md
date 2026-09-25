@@ -154,6 +154,14 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - `Wsl.RunAsync` / `RunStreamingAsync` log every call (numbered `wsl#N`) with args, exit, duration, output
 - Don't log in code that runs every 30 s (snapshot, quiet jobs) unless something changed or failed
 
+## Don't boot the WSL VM needlessly
+- Any `wsl -d <distro> ...` call boots the VM when WSL is stopped: measured 2026-09-25 on the 32-thread laptop,
+  ~1.6 guest cores + ~5 host cores for 2-3 s (fans ramp; Task Manager shows the app at 0%, the guest time is
+  only in `\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time`). An idle VM costs 0.
+  `wsl --version` / `--list` don't boot it; the MSFT_Disk snapshot is ~35 ms
+- So the scan runs first (it reads disks from Windows) and `FsSupport.EnsureAsync` runs only when a volume is
+  mountable (not mounted, not unplugged); GUI RequestScan and CLI both. MountManager checks support itself before a mount
+
 ## Rules learned the hard way (keep these)
 - No double hyphen inside XML comments (app.manifest, csproj, App.config): the Windows loader
   rejects the manifest and the exe fails with a side-by-side configuration error

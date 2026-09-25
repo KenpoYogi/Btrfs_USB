@@ -1,36 +1,34 @@
 # ▶ START HERE — Linux USB Mounter resume
 
-**⭐ LAST COMMIT (2026-09-25): RENAMED AGAIN, XNIX → LINUX USB MOUNTER — OUTPUT FILES LinuxUsbMounter.exe / .exe.config / .com.**
-Builds clean (0 warnings). On top of `159c44d` (pushed). Data folder, mutex / window message and logon task still keep the old
-`BtrfsUsbMounter` name on purpose (see CLAUDE.md "Name"). **Not run yet.**
+**⭐ LAST COMMIT (2026-09-25): THE WSL VM IS NO LONGER BOOTED WHEN NO DRIVE CAN BE MOUNTED** (user saw fans spike with the
+app at 0 % CPU: the VM boot costs ~5 host + ~2 guest cores for 2-3 s and Task Manager doesn't show guest time). Builds clean.
+On top of `e2b0d11` (rename to Linux USB Mounter, pushed). **Not run yet.**
 
-_**Next: ① (done: committed, pushed)** **② run the app elevated** (user): starts as "Linux USB Mounter", reads the existing
-state.json, re-points the logon task; `LinuxUsbMounter --list` from a terminal. Delete the stale BtrfsUsbMounter.* and
-XnixUsbMounter.* files in bin\ and in any install folder. **③ UFS disk + earlier run list** (see ⑤)._
+_**Next: ① (done: committed, pushed)** **② run the app elevated** with no Linux drive plugged in: the log shows
+"Filesystem support check skipped" and no `wsl#3 ... sh -c` call, and `vmmemWSL` doesn't appear; then plug in the btrfs
+drive: support check + mount as before. **③ UFS disk + earlier run list** (see ⑤)._
 
 > ### 1. GOAL
 > **Enduring:** a standalone Windows tool that mounts Linux/Mac/BSD-formatted USB drives through WSL2 (`wsl --mount`): btrfs,
 > ext2/3/4, XFS read/write with the stock kernel; JFS, HFS+, ZFS, APFS, UFS through modules built by
 > `tools/build-wsl-modules.sh`; APFS read-only through fsapfsmount otherwise; ReiserFS on kernels before 6.13; Reiser4
 > detect-only. Safe eject. Never blocks the UI thread; every wsl.exe call has a timeout and honours cancellation.
-> **Now:** rename the output files (and the product) to LinuxUsbMounter / Linux USB Mounter (user request, 2026-09-25).
+> **Now:** don't start the WSL VM when there is nothing to mount (fan spikes, user report 2026-09-25).
 
 > ### 2. STATE
-> **Committed and pushed** on `main` (previous commit `159c44d`). Clean `dotnet build -c Release`: 0 warnings, 0 errors.
+> **Committed and pushed** on `main` (previous commit `e2b0d11`). Clean `dotnet build -c Release`: 0 warnings, 0 errors.
 > **Built modules:** Tumbleweed and Kali both have the final `ufs.ko` (`wsl_handoff=1`) in `/var/lib/wsl-modules/6.18.33.2-...`.
 > **Test rig (Tumbleweed, /var/tmp/fbsdvm):** FreeBSD 15.1 BASIC-CI image + `qemu-x86` + `expect`; scripts in the session
 > scratchpad (not kept). FreeBSD sources for reference in /var/tmp/fbsd. Both are disposable.
 
 > ### 3. FILES THIS TURN
-> `LinuxUsbMounter.csproj` (renamed) · every `src/**/*.cs` · `launcher/Launcher.cs` · `app.manifest` · `.vscode/*.json` · `LICENSE` ·
-> `tools/build-wsl-modules.sh` (comments) · `README.md` · `docs/distros/*.md` · `CLAUDE.md` · `STATUS.md` · this file.
+> `src/UI/MainForm.cs` (RequestScan) · `src/Program.cs` (CLI) · `CLAUDE.md` · `STATUS.md` · this file.
 
 > ### 4. WHAT CHANGED
-> · **Name:** XnixUsbMounter / Xnix USB Mounter → LinuxUsbMounter / Linux USB Mounter everywhere (project, assembly,
->   namespaces, display name, headers, docs). README upgrade section covers both older names.
-> · **Kept old name:** `%LOCALAPPDATA%\BtrfsUsbMounter`, `Local\BtrfsUsbMounter.GUI` / `.Ack`, `BtrfsUsbMounter.ShowWindow`,
->   logon task `BtrfsUsbMounter`, the `BtrfsUsbMounter.ps1` check.
-> · Before: `159c44d` ReiserFS / Reiser4 out of the docs; `29f15c5` first rename (Xnix); `a874ec1` empty-list text.
+> · **Cause found:** the first scan's support check (`wsl -d ... sh -c`) booted the VM even with no Linux drive attached.
+>   UI timers, the 30 s MSFT_Disk check (~35 ms), the idle VM and the keep-alive cost nothing measurable.
+> · **Fix:** scan first; the support check runs only when a volume is mountable. Same for the CLI. Mount checks support itself.
+> · Before: `e2b0d11` rename to Linux USB Mounter; `159c44d` ReiserFS / Reiser4 out of the docs.
 
 > ### 5. ⭐ THE RUN LIST
 > **① (done)** Run it elevated (above). **② The app with a UFS disk**, elevated (above); ideally a real FreeBSD USB disk, then

@@ -8,7 +8,19 @@
 
 ---
 
-## ⭐ (this commit) — **RENAMED AGAIN: XNIX USB MOUNTER → LINUX USB MOUNTER, OUTPUT FILES LinuxUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("from XnixUsbMounter to LinuxUsbMounter to be a bit more descriptive ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
+## ⭐ (this commit) — **NO WSL VM BOOT WHEN THERE IS NOTHING TO MOUNT (FANS SPIKED WITH THE APP AT 0% CPU).** _2026-09-25. Evidence: user report ("cpu usage is 0% in task manager, the system cpu and gpu fan speeds spike"). mounter.log session 08:29-08:31: the only heavy step was the first scan's filesystem support check (`wsl -d openSUSE-Tumbleweed ... sh -c`, 4,036 ms = VM boot) although the only USB disk (Sabrent SSD) had no supported filesystem. Measured with hypervisor counters: cold VM start ~1.6 + 1.2 guest cores and ~16 % of 32 host threads for 2-3 s; idle VM (and keep-alive) 0 guest CPU, host CPU unchanged, no GPU use by msrdc / vmmemWSL; MSFT_Disk query ~35 ms; UI timers trivial; btrfsmaintenance timers only cover / (ext4). `dotnet build -c Release`: 0 warnings, 0 errors. Not run in the GUI._
+
+- **MainForm.RequestScan:** scan first, then `FsSupport.EnsureAsync` only if a volume is mountable (not mounted, not
+  unplugged); otherwise a debug line "Filesystem support check skipped". Cache clear / sync order unchanged.
+- **CLI (`Program.cs`):** same condition for `--list` / `--mount-all`.
+- A mount still checks support itself (`MountManager`), so a drive plugged in later works as before.
+- **Not changed:** keep-alive while mounted (idle VM costs nothing); WSLg (`msrdc`) is a user setting
+  (`guiApplications=false` in .wslconfig), not app code. CLAUDE.md "Don't boot the WSL VM needlessly" has the numbers.
+- **Files.** `src/UI/MainForm.cs`, `src/Program.cs`, `CLAUDE.md`, `RESUME.md`, this file.
+
+---
+
+## `e2b0d11` — **RENAMED AGAIN: XNIX USB MOUNTER → LINUX USB MOUNTER, OUTPUT FILES LinuxUsbMounter.exe / .exe.config / .com.** _2026-09-25. Evidence: user request ("from XnixUsbMounter to LinuxUsbMounter to be a bit more descriptive ... all the code and documentation changes"). Clean `obj`, `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release
 et48 has LinuxUsbMounter.exe / .exe.config / .com / .pdb, ProductName "Linux USB Mounter", OriginalFilename LinuxUsbMounter.exe. `git grep -i xnix` outside the status docs: only the README upgrade note and CLAUDE.md "Name". Not run (elevated GUI)._
 
 - **Renamed** everything `29f15c5` renamed: `XnixUsbMounter.csproj` → `LinuxUsbMounter.csproj` (git mv), assembly, namespaces,

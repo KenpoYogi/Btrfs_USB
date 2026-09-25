@@ -1094,12 +1094,22 @@ namespace LinuxUsbMounter.UI
             {
                 // Refresh re-checks the kernel too (a custom kernel or new tools may have been installed)
                 if (clearCache) engine.Support.Forget(supportDistro);
-                try { await engine.Support.EnsureAsync(supportDistro, ct).ConfigureAwait(false); }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { Log.DebugException("Filesystem support check failed", ex); }
                 if (clearCache) engine.Cache.Clear();
                 if (sync) await engine.Mounts.SyncMountStateAsync(ct).ConfigureAwait(false);
-                return await engine.Scanner.ScanAsync(includeAll, ct).ConfigureAwait(false);
+                ScanResult scan = await engine.Scanner.ScanAsync(includeAll, ct).ConfigureAwait(false);
+                // The support check runs inside the distro, so it boots the WSL VM (several cores for a few seconds).
+                // The scan itself reads the disks from Windows: only ask the distro when there is something to mount.
+                if (scan.Volumes.Any(v => !v.Mounted && !v.Disconnected))
+                {
+                    try { await engine.Support.EnsureAsync(supportDistro, ct).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex) { Log.DebugException("Filesystem support check failed", ex); }
+                }
+                else
+                {
+                    Log.Debug("Filesystem support check skipped: nothing to mount, so WSL is not started for it.");
+                }
+                return scan;
             }, JobFlags.None);
 
             if (r != null)
