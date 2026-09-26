@@ -1,10 +1,12 @@
 # ▶ START HERE — Linux USB Mounter resume
 
-**⭐ LAST COMMIT (2026-09-25): THE WSL VM IS NO LONGER BOOTED WHEN NO DRIVE CAN BE MOUNTED** (user saw fans spike with the
-app at 0 % CPU: the VM boot costs ~5 host + ~2 guest cores for 2-3 s and Task Manager doesn't show guest time). Builds clean.
-On top of `e2b0d11` (rename to Linux USB Mounter, pushed). **Not run yet.**
+**⭐ LAST COMMIT (2026-09-26): NEW APP ICON.** `assets/LinuxUsbMount.ico` (user-supplied, made in another session: dark
+drive, blue USB trident, green folder-tree badge; 16-256 px, all 32-bit DIB) + `assets/LinuxUsbMount_2048.png` replace the
+old btrfs "b" `assets/app.ico` (deleted). csproj `ApplicationIcon` points at it (the .com launcher picks it up via
+`$(ApplicationIcon)`); README layout updated. Builds clean; exe and .com embed it pixel-exact. Committed and pushed.
+Before it: `57cc60c` the WSL VM is no longer booted when no drive can be mounted (fan spikes). **Neither run yet.**
 
-_**Next: ① (done: committed, pushed)** **② run the app elevated** with no Linux drive plugged in: the log shows
+_**Next: ① (done: committed, pushed)** **② run the app elevated** (check the new icon in tray / title bar / taskbar too) with no Linux drive plugged in: the log shows
 "Filesystem support check skipped" and no `wsl#3 ... sh -c` call, and `vmmemWSL` doesn't appear; then plug in the btrfs
 drive: support check + mount as before. **③ UFS disk + earlier run list** (see ⑤)._
 

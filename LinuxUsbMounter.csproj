@@ -11,7 +11,7 @@
     <RootNamespace>LinuxUsbMounter</RootNamespace>
     <AssemblyName>LinuxUsbMounter</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>assets\app.ico</ApplicationIcon>
+    <ApplicationIcon>assets\LinuxUsbMount.ico</ApplicationIcon>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <!-- a 32-bit process would be redirected away from the real wsl.exe -->
     <Prefer32Bit>false</Prefer32Bit>
@@ -44,7 +44,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="assets\app.ico" />
+    <None Include="assets\LinuxUsbMount.ico" />
+    <None Include="assets\LinuxUsbMount_2048.png" />
     <!-- the license travels with every copy of the program (MIT notice condition, Commons Clause included) -->
     <None Include="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <!-- run inside WSL by Tools > Build filesystem drivers -->

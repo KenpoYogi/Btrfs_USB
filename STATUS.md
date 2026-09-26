@@ -8,7 +8,19 @@
 
 ---
 
-## ⭐ (this commit) — **NO WSL VM BOOT WHEN THERE IS NOTHING TO MOUNT (FANS SPIKED WITH THE APP AT 0% CPU).** _2026-09-25. Evidence: user report ("cpu usage is 0% in task manager, the system cpu and gpu fan speeds spike"). mounter.log session 08:29-08:31: the only heavy step was the first scan's filesystem support check (`wsl -d openSUSE-Tumbleweed ... sh -c`, 4,036 ms = VM boot) although the only USB disk (Sabrent SSD) had no supported filesystem. Measured with hypervisor counters: cold VM start ~1.6 + 1.2 guest cores and ~16 % of 32 host threads for 2-3 s; idle VM (and keep-alive) 0 guest CPU, host CPU unchanged, no GPU use by msrdc / vmmemWSL; MSFT_Disk query ~35 ms; UI timers trivial; btrfsmaintenance timers only cover / (ext4). `dotnet build -c Release`: 0 warnings, 0 errors. Not run in the GUI._
+## ⭐ (this commit) — **NEW APP ICON: assets/LinuxUsbMount.ico REPLACES THE OLD BTRFS "b" app.ico.** _2026-09-26. Evidence: user request ("I put an Icon LinuxUsbMount.ico created in another Claude session in the assets folder. Please use this icon"). The .ico is well formed: 10 frames 16/20/24/32/40/48/64/96/128/256, all 32-bit DIB, all inside the file; every frame previewed on light and dark backgrounds. `dotnet build -c Release`: 0 warnings, 0 errors. Embedded 32 px icon of LinuxUsbMounter.exe and of the .com (read through a renamed copy: the shell won't extract icons from a .com) matches the .ico pixel for pixel. Not seen in the running app's tray / title bar (needs an elevated launch)._
+
+- **Icon:** dark drive with a blue USB trident, amber activity light, USB plug on top, green folder-tree badge ("filesystem
+  attached"). `LinuxUsbMount_2048.png` is the same art at 2048 x 2048.
+- **csproj:** `ApplicationIcon` → `assets\LinuxUsbMount.ico` (the `.com` launcher's `Win32Icon` follows `$(ApplicationIcon)`);
+  both asset files listed as `None` items. `assets/app.ico` deleted. `UiKit.AppIcon` reads the exe's icon, so no code change.
+- **Dropped:** a script-drawn Tux icon (`tools/make-icon.ps1`, never committed) made earlier the same session.
+- **Files.** `LinuxUsbMounter.csproj`, `assets/LinuxUsbMount.ico`, `assets/LinuxUsbMount_2048.png`, `assets/app.ico` (deleted),
+  `README.md` (project layout), `RESUME.md`, this file.
+
+---
+
+## `57cc60c` — **NO WSL VM BOOT WHEN THERE IS NOTHING TO MOUNT (FANS SPIKED WITH THE APP AT 0% CPU).** _2026-09-25. Evidence: user report ("cpu usage is 0% in task manager, the system cpu and gpu fan speeds spike"). mounter.log session 08:29-08:31: the only heavy step was the first scan's filesystem support check (`wsl -d openSUSE-Tumbleweed ... sh -c`, 4,036 ms = VM boot) although the only USB disk (Sabrent SSD) had no supported filesystem. Measured with hypervisor counters: cold VM start ~1.6 + 1.2 guest cores and ~16 % of 32 host threads for 2-3 s; idle VM (and keep-alive) 0 guest CPU, host CPU unchanged, no GPU use by msrdc / vmmemWSL; MSFT_Disk query ~35 ms; UI timers trivial; btrfsmaintenance timers only cover / (ext4). `dotnet build -c Release`: 0 warnings, 0 errors. Not run in the GUI._
 
 - **MainForm.RequestScan:** scan first, then `FsSupport.EnsureAsync` only if a volume is mountable (not mounted, not
   unplugged); otherwise a debug line "Filesystem support check skipped". Cache clear / sync order unchanged.

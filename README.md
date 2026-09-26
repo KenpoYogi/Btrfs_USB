@@ -213,7 +213,8 @@ read-only offline check with saved reports, tools installer, and no repair butto
 LinuxUsbMounter.csproj      SDK-style project, net48, C# 7.3
 app.manifest                requireAdministrator, Windows 10/11 compatibility
 App.config                  per-monitor DPI awareness
-assets/app.ico              application and tray icon
+assets/LinuxUsbMount.ico    application and tray icon (16-256 px)
+assets/LinuxUsbMount_2048.png  the same icon at 2048 x 2048
 src/Program.cs              entry point, single instance, command-line mode
 src/Core/Infrastructure.cs  paths, logger (rotates at 10 MB), formatting
 src/Core/Diagnostics.cs     environment details written to the log at startup
