@@ -5,7 +5,7 @@
 `bin\Release\LinuxUsbMounter-2.0.0-Portable.zip`. App changes: quit message `LinuxUsbMounter.Quit`, and CLI output to a
 pipe / file when redirected. Docs: README Install (installer OR portable), the 9 distro guides, CLAUDE.md. Builds clean.
 Icon is now `assets/LinuxUsbMount_v3.ico` (drive + Tux; exe, .com, setup; README credits Larry Ewing); the Installed apps
-entry has no Publisher (user's name removed). Don't commit the untracked v2 files (Google-sourced badge, unknown rights).
+entry has no Publisher (user's name removed). The Google-sourced v2 icon files were deleted (never committed).
 **Logic tested by reflection in a non-elevated session; a real elevated install / uninstall has NOT been run.**
 Before it: `72f1f60` new app icon (v1, now replaced by v3).
 
