@@ -6,6 +6,8 @@ WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline che
 - .NET Framework 4.8, C# 7.3, WinForms, **no NuGet packages**
 - `LinuxUsbMounter.exe` (plus its `.exe.config`) and a small console front end `LinuxUsbMounter.com`;
   .NET 4.8 ships with Windows 11
+- Two ways to install (see [Install](#install)): the installer `LinuxUsbMounter-<version>-Setup.exe` (with an
+  uninstaller), or the portable `LinuxUsbMounter-<version>-Portable.zip` (extract anywhere, nothing to install)
 - Uses the same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version, so
   settings and mount state carry over
 
@@ -38,6 +40,9 @@ dotnet build -c Release
 
 Output in `bin\Release\net48\`: `LinuxUsbMounter.exe`, `LinuxUsbMounter.exe.config` and
 `LinuxUsbMounter.com` (the console front end, built from `launcher\Launcher.cs` by the same build).
+The same build also makes the two downloads for users (see [Install](#install)): the installer
+`bin\Release\LinuxUsbMounter-<version>-Setup.exe` (from `installer\Setup.cs`, with the program files packed
+inside it) and the portable `bin\Release\LinuxUsbMounter-<version>-Portable.zip` (the `net48` folder zipped).
 
 Other tasks (**Terminal > Run Task**): *build release*, *clean*, *run release (elevated)*.
 
@@ -48,33 +53,102 @@ The program requires administrator rights (`requireAdministrator` in `app.manife
 are included: the window, and the command line with `--list`. Debugging .NET Framework
 programs uses the `clr` debugger of the C# extension (Windows only).
 
-## Install / migrate from the PowerShell version
+## Install
+
+There are two ways to get the program onto a PC. Pick one; both run the same program with the same
+settings (`%LOCALAPPDATA%\BtrfsUsbMounter`):
+
+| | **Installer** (recommended) | **Portable** (no installation) |
+|---|---|---|
+| Download | `LinuxUsbMounter-<version>-Setup.exe` | `LinuxUsbMounter-<version>-Portable.zip` |
+| Goes to | `C:\Program Files\Linux_USB`, or a folder you choose | any folder you extract it to (a USB stick works too) |
+| Start menu / desktop shortcut, PATH | yes (you choose) | no; make your own shortcut if you want one |
+| Listed in Installed apps, with an uninstaller | yes | no; to remove it, delete the folder |
+| Updating | run the newer setup | exit the program, replace the files |
+
+Both are in `bin\Release\` after a build. The zip holds exactly the files the installer puts in place.
+
+### Installer
+
+Run **`LinuxUsbMounter-<version>-Setup.exe`** and click **Yes** when Windows asks for administrator rights.
+
+- **Install to:** `C:\Program Files\Linux_USB` by default; type another folder or click **Browse...**
+  (picking a folder that already holds other things installs into a `Linux_USB` folder inside it).
+- **Options:** Start menu shortcut (on), desktop shortcut (off), add the folder to the system PATH so
+  `LinuxUsbMounter --list` works in any terminal (off), start the program when setup finishes (on).
+  The shortcuts are for all users.
+- The program is registered in **Settings > Apps > Installed apps**, and setup copies itself into the
+  folder as `Uninstall.exe`.
+- The program is not code-signed, so Windows SmartScreen may warn once about an unknown publisher
+  (**More info > Run anyway**).
+
+**Updating:** run the newer setup. It finds the installed copy and offers **Update** in the same folder
+(or pick a new folder: the old one is removed and start at logon follows the move). A running copy is
+closed first: mounted drives stay mounted, and a task it was busy with (eject, scrub, check) is
+cancelled. Settings, mount state and the log are kept.
+
+**Other copies:** if a copy that setup did not install is running (a hand-copied folder, or an older
+`BtrfsUsbMounter.exe` / `XnixUsbMounter.exe`), setup asks whether to close it. Only one copy
+runs at a time, so while it runs the new one would just bring that copy's window up. Its files are
+left alone; delete that folder yourself when you no longer need it. The logon task is re-pointed to
+the installed program the first time it starts.
+
+### Uninstall
+
+**Settings > Apps > Installed apps > Linux USB Mounter > Uninstall**, or run `Uninstall.exe` in the
+install folder (or the setup file again, which offers **Uninstall...**). The uninstaller shows what
+it is about to do and warns first when the program is running or drives are mounted. Then it:
+
+1. closes the running program (a task it was busy with is cancelled);
+2. unmounts every mounted drive with `LinuxUsbMounter --unmount-all`: pending writes are flushed
+   first, which can take a while. **Don't unplug the drives until it says they are unmounted.** If a
+   drive can't be unmounted, it asks before going on (the drive then stays attached to WSL until
+   `wsl --shutdown` or a restart). If another copy of the program is still running from a different
+   folder, the drives are left to that copy;
+3. removes start at logon (if it starts this copy), the shortcuts, the PATH entry, the Installed apps
+   entry and the program's files. Files you put in the install folder yourself are kept, and then so
+   is the folder;
+4. deletes your settings and logs (`%LOCALAPPDATA%\BtrfsUsbMounter`) only if you tick that box.
+
+Filesystem drivers built inside your WSL distros (`/var/lib/wsl-modules`) are not touched.
+
+### Portable (copy the files, no installation)
+
+Extract `LinuxUsbMounter-<version>-Portable.zip` to a folder of your choice, e.g. `C:\Tools\LinuxUsbMounter\`
+(or copy everything in `bin\Release\net48\` there), and start `LinuxUsbMounter.exe`. Nothing is written
+outside that folder except the settings and log in `%LOCALAPPDATA%\BtrfsUsbMounter`, and the logon task if
+you tick **Start in tray at logon**.
+
+Keep the files together in the same layout: `LinuxUsbMounter.exe`, `LinuxUsbMounter.exe.config`,
+`LinuxUsbMounter.com`, `LICENSE` **and the `tools\` folder** (with `build-wsl-modules.sh` inside). Without
+`tools\`, **Tools > Build filesystem drivers** fails with *The driver build script is missing*; without
+`LICENSE`, **About and license** falls back to the web page. (The `.pdb` file is optional.)
+
+- **Update:** exit the program (tray icon > Exit), extract the new zip over the folder, start it again.
+- **Remove:** exit the program, untick **Start in tray at logon** first if you use it (eject your drives
+  first too), then delete the folder.
+- **Moved the folder?** Untick and re-tick **Start in tray at logon** from the new location.
+- **Switching to the installer later** is fine: setup offers to close the portable copy if it is running;
+  delete the portable folder afterwards.
+
+### Migrating from the PowerShell version
 
 1. Exit the PowerShell tool (tray icon > Exit).
-2. Copy everything in `bin\Release\net48\` to a permanent folder, e.g. `C:\Tools\LinuxUsbMounter\`:
-   `LinuxUsbMounter.exe`, `LinuxUsbMounter.exe.config`, `LinuxUsbMounter.com`, `LICENSE` **and the
-   `tools\` folder** (with `build-wsl-modules.sh` inside), keeping the same layout. Without `tools\`,
-   **Tools > Build filesystem drivers** fails with *The driver build script is missing*; without
-   `LICENSE`, **About and license** falls back to the web page. (The `.pdb` file is optional.)
-3. Start `LinuxUsbMounter.exe`. On first start it:
-   - reads your existing settings and mounted drives,
-   - notices that the "start at logon" task still points at the PowerShell script and
-     re-points it to the new program automatically.
-4. Delete the old Desktop shortcut and `Mount-BtrfsUsb.cmd` (or keep the old folder as a fallback;
+2. Install with the setup, or use the portable zip (above), and start the program. On first start it
+   reads your existing settings and mounted drives, and re-points the "start at logon" task from the
+   PowerShell script to the new program.
+3. Delete the old Desktop shortcut and `Mount-BtrfsUsb.cmd` (or keep the old folder as a fallback;
    the two versions can never run at the same time).
-
-If you move the `.exe` later, untick and re-tick **Start in tray at logon** from the new location.
 
 ### Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe
 
 The program used to be called Btrfs USB Mounter (`BtrfsUsbMounter.exe` / `.com`), and briefly Xnix USB Mounter
-(`XnixUsbMounter.exe` / `.com`). To upgrade, exit the old copy (tray icon > Exit), copy the new files in, delete
+(`XnixUsbMounter.exe` / `.com`). To upgrade, run the setup (it offers to close the old copy if it is running),
+then delete the old folder; or, by hand, exit the old copy (tray icon > Exit), copy the new files in, delete
 the old `.exe`, `.exe.config` and `.com` files, and start `LinuxUsbMounter.exe`. Nothing else changes: settings, mount state and
 the log stay in `%LOCALAPPDATA%\BtrfsUsbMounter`, the **start at logon** task (still named `BtrfsUsbMounter`
 in Task Scheduler) is re-pointed to the new program on its first start, and an old copy that is still
 running is detected as usual.
-
-The program is not code-signed, so Windows SmartScreen may warn once about an unknown publisher.
 
 ## Supported filesystems
 
@@ -185,10 +259,14 @@ LinuxUsbMounter --help
 LinuxUsbMounter --list --verbose    also print the troubleshooting detail (see Logging below)
 ```
 
-In PowerShell, from the program folder, prefix it with `.\` (for example `.\LinuxUsbMounter --list`).
+In PowerShell, from the program folder (`C:\Program Files\Linux_USB` when installed with setup), prefix
+it with `.\` (for example `.\LinuxUsbMounter --list`). If setup added the folder to the PATH, the plain
+name works in any new terminal.
 
 Run from an **administrator** terminal to see the output there. From a normal terminal, Windows asks
 for administrator rights and the output opens in its own console window, which waits for Enter.
+Redirected output (`LinuxUsbMounter --list > drives.txt`, or a program reading it through a pipe, as the
+uninstaller does with `--unmount-all`) goes to the file or pipe, with no console window.
 Exit code 0 = success.
 
 ## What changed compared to the PowerShell version
@@ -213,8 +291,8 @@ read-only offline check with saved reports, tools installer, and no repair butto
 LinuxUsbMounter.csproj      SDK-style project, net48, C# 7.3
 app.manifest                requireAdministrator, Windows 10/11 compatibility
 App.config                  per-monitor DPI awareness
-assets/LinuxUsbMount.ico    application and tray icon (16-256 px)
-assets/LinuxUsbMount_2048.png  the same icon at 2048 x 2048
+assets/LinuxUsbMount_v3.ico application, setup and tray icon (16-256 px)
+assets/LinuxUsbMount_2048_v3.png  the same icon at 2048 x 2048
 src/Program.cs              entry point, single instance, command-line mode
 src/Core/Infrastructure.cs  paths, logger (rotates at 10 MB), formatting
 src/Core/Diagnostics.cs     environment details written to the log at startup
@@ -230,6 +308,8 @@ src/UI/UiKit.cs             shared controls (usage bar, flicker-free list)
 src/UI/MainForm.cs          main window and tray
 src/UI/DriveInfoForm.cs     drive info window
 launcher/Launcher.cs        console front end, compiled to LinuxUsbMounter.com
+installer/Setup.cs          installer + uninstaller, compiled to LinuxUsbMounter-<version>-Setup.exe
+installer/setup.manifest    its manifest (administrator rights, DPI awareness)
 ```
 
 ## Logging
@@ -273,6 +353,9 @@ with the [Commons Clause License Condition v1.0](https://commonsclause.com/)
 This is a source-available license, not an open-source one: the Commons Clause restricts selling,
 which open-source licenses may not do.
 
+**Credits:** the penguin in the icon is Tux, drawn by Larry Ewing (lewing@isc.tamu.edu) with The GIMP.
+Linux® is the registered trademark of Linus Torvalds in the U.S. and other countries.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -282,5 +365,8 @@ which open-source licenses may not do.
 | Nothing happens on start | Another copy is running hidden; the new launch offers to end it after 2 s |
 | Drive not listed | Tick *Include non-USB disks* (some enclosures report as SCSI), click Refresh |
 | Mount fails | The log shows the error, a hint and, if relevant, the kernel messages |
-| "The driver build script is missing" | Copy the `tools\` folder from `bin\Release\net48\` next to `LinuxUsbMounter.exe` |
+| "The driver build script is missing" | Installer: run the setup again (it puts the `tools\` folder back). Portable: extract the `tools\` folder from the zip next to `LinuxUsbMounter.exe` |
+| Setup or the uninstaller says the program "is still running" | It did not close within 15 s and could not be ended: exit it (tray icon > Exit) and try again |
+| The uninstaller says drives are still mounted | Stop there (**No**), start the program, eject the drives (the log says why one is busy), then uninstall again |
+| The new version doesn't start after setup, an old window appears | A copy from another folder is running: exit it (tray icon > Exit), or run setup again and let it close it |
 | Logs | `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` (see Logging above); check reports in the `checks` subfolder |

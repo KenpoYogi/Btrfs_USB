@@ -480,6 +480,15 @@ namespace LinuxUsbMounter.UI
                 ShowMainWindow();
                 SingleInstance.Acknowledge();
             }
+            else if (m.Msg == SingleInstance.QuitMessage && SingleInstance.QuitMessage != 0 && !reallyExit)
+            {
+                // the installer / uninstaller: exit without questions. A running task is cancelled (a cancelled eject
+                // leaves the drive mounted); the uninstaller then unmounts with --unmount-all
+                Log.Warn("Asked to exit by the installer or uninstaller. Mounted drives stay mounted.");
+                reallyExit = true;
+                jobs.CancelAll();
+                BeginInvoke(new Action(Close));
+            }
             base.WndProc(ref m);
         }
 

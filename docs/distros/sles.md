@@ -195,8 +195,13 @@ matter if you installed those options.
 
 ## Step 5: Use it with Linux USB Mounter
 
-1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `LinuxUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+1. Get the app one of two ways (see [Install](../../README.md#install)):
+   - **Installer:** run `LinuxUsbMounter-<version>-Setup.exe` (default folder `C:\Program Files\Linux_USB`)
+     and let it start the app, or open **Linux USB Mounter** from the Start menu later.
+   - **Portable:** extract `LinuxUsbMounter-<version>-Portable.zip` to any folder and start
+     `LinuxUsbMounter.exe` there. Nothing is installed.
+
+   Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **SUSE-Linux-Enterprise-16.0**. To make it the default
    for everything, run `wsl --set-default SUSE-Linux-Enterprise-16.0` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -204,7 +209,7 @@ matter if you installed those options.
    or at `\\wsl.localhost\SUSE-Linux-Enterprise-16.0\mnt\wsl\<label>`.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
-To test from the command line, open an administrator terminal in the program folder and run
+To test from the command line, open an administrator terminal in the program folder (`C:\Program Files\Linux_USB` when installed, or your portable folder) and run
 `.\LinuxUsbMounter --list`.
 
 ## Troubleshooting

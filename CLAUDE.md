@@ -23,7 +23,10 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - AnyCPU, Prefer32Bit=false (a 32-bit process would be redirected away from the real wsl.exe)
 
 ## Commands
-- Build: `dotnet build -c Release` -> `bin\Release\net48\LinuxUsbMounter.exe` (+ `.exe.config`, `.com`)
+- Build: `dotnet build -c Release` -> `bin\Release\net48\LinuxUsbMounter.exe` (+ `.exe.config`, `.com`) and the
+  two user downloads: installer `bin\Release\LinuxUsbMounter-<Version>-Setup.exe` (BuildSetup target) and portable
+  `bin\Release\LinuxUsbMounter-<Version>-Portable.zip` (BuildPortableZip: ZipDirectory of the net48 folder). User
+  docs always present both (user request 2026-09-26: installer OR copy the files)
 - CLI check without the GUI: `LinuxUsbMounter --list` (elevated terminal; no extension, so the `.com` runs);
   add `--verbose` to see the DEBUG lines too
 - Logs: `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log`; state: `state.json` in the same folder
@@ -50,7 +53,24 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 - `src/UI`: MainForm (tray, owner-drawn Space column, WM_DEVICECHANGE in WndProc, tools menu),
   DriveInfoForm (usage bar, allocation, error counters, scrub)
 - `src/Program.cs`: single instance (mutex `Local\BtrfsUsbMounter.GUI`, shared with the old
-  PowerShell version), show-window broadcast + ack event, CLI mode
+  PowerShell version), show-window broadcast + ack event, CLI mode. CLI output goes to the pipe / file when stdout
+  is redirected (GetFileType disk or pipe; Console.IsOutputRedirected is also true for a GUI process with no handle),
+  so no console and no "Press Enter": the uninstaller relies on that for `--unmount-all`
+- Quit message `LinuxUsbMounter.Quit` (new name; older copies don't know it): MainForm exits without prompts, cancels
+  the running job (a cancelled eject leaves the drive mounted), drives stay mounted. Posted by the installer to the
+  top-level windows of processes running from the install folder
+- `installer/Setup.cs` (+ `setup.manifest`, requireAdministrator, system DPI aware): one file, compiled by the
+  BuildSetup target like the .com, program files embedded as `payload/...` resources (the csproj `SetupPayload`
+  items; the uninstaller deletes exactly those + Uninstall.exe, then the folder only if empty). Version comes from a
+  generated `obj\<cfg>\setup\SetupInfo.cs` (not `$(IntermediateOutputPath)`: empty at evaluation, the file then
+  landed in the project root and the main build compiled it). Install: default `%ProgramFiles%\Linux_USB`; stops
+  copies in the target / old folder (quit message, 15 s, then Kill) and, if the user agrees, copies elsewhere
+  (LinuxUsbMounter / BtrfsUsbMounter / XnixUsbMounter.exe, they hold the mutex); all-users Start menu / desktop .lnk
+  via late-bound WScript.Shell; optional machine PATH; HKLM Uninstall\LinuxUsbMounter (Lum* values record what was
+  added); moving re-points the logon task. Uninstall: Uninstall.exe re-runs itself from %TEMP% (`/uninstall /from
+  <dir>`, deletes itself after), closes the app, `--unmount-all` if state.json has mounts (skipped while a copy from
+  another folder runs), asks before going on if drives stay mounted, removes task (only if it starts this copy),
+  shortcuts, PATH, registry, files; settings folder only if ticked
 
 ## Filesystems
 - User docs (README, docs/distros, --help, menu and dialog texts) do NOT mention ReiserFS or Reiser4 (user decision
@@ -187,6 +207,13 @@ Same convention as VariableDrive / FeatureRecognition: two files at the repo roo
 - `STATUS.md`: append-only trail, one entry per commit, newest first, each naming its evidence. Prepend; never
   rewrite or truncate. An entry goes in with its own commit, headed `(this commit)`; the next change puts the hash in
 - If either looks reverted or shrunk on disk: `git checkout HEAD -- RESUME.md STATUS.md`
+
+## Installer verification (2026-09-26, non-elevated session)
+Loaded the setup exe by reflection: path checks, payload extract (all 6 files byte-identical to the build, Uninstall.exe
+= the setup), .lnk target/icon, removal keeps user files and the folder, state.json read, logon task query, window
+layout (DrawToBitmap). Process finder + Kill fallback against a renamed ping.exe; quit message against a hidden
+WinForms stand-in (closed in 0.1 s). NOT run: a real elevated install / update / uninstall (HKLM, Program Files,
+all-users shortcuts, PATH), the real app answering the quit message, `--unmount-all` through the pipe
 
 ## Verification done before handover
 Compiles against the 4.8 reference assemblies; 32 core tests passed under Mono (superblock

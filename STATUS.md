@@ -8,7 +8,38 @@
 
 ---
 
-## ⭐ (this commit) — **NEW APP ICON: assets/LinuxUsbMount.ico REPLACES THE OLD BTRFS "b" app.ico.** _2026-09-26. Evidence: user request ("I put an Icon LinuxUsbMount.ico created in another Claude session in the assets folder. Please use this icon"). The .ico is well formed: 10 frames 16/20/24/32/40/48/64/96/128/256, all 32-bit DIB, all inside the file; every frame previewed on light and dark backgrounds. `dotnet build -c Release`: 0 warnings, 0 errors. Embedded 32 px icon of LinuxUsbMounter.exe and of the .com (read through a renamed copy: the shell won't extract icons from a .com) matches the .ico pixel for pixel. Not seen in the running app's tray / title bar (needs an elevated launch)._
+## ⭐ (this commit) — **INSTALLER / UNINSTALLER (LinuxUsbMounter-<version>-Setup.exe) AND A PORTABLE ZIP.** _2026-09-26. Evidence: user requests ("a small windows installer/uninstaller ... install (to any desired location) ... easily uninstall ... stop the application/unmount drives if necessary but warn the user. The default location will be C:\Program Files\Linux_USB"; "update all relevant documentation"; "make sure the user understands they can either run the installer OR copy the files manually (a Portable version)"). `dotnet build -c Release`: 0 warnings, 0 errors; bin\Release has LinuxUsbMounter-2.0.0-Setup.exe (2.1 MB) and -Portable.zip (the 6 program files). Tested in a NON-elevated session by loading the setup exe through reflection: install-path checks (Program Files root, drive root, Windows, profile, Desktop, relative, empty rejected), payload extract (all 6 files byte-identical to bin\Release\net48, Uninstall.exe identical to the setup), .lnk target / icon / working folder, removal deletes only its files and keeps a user file + folder, state.json read, logon task query (found the user's C:\Apps\Linux_USB copy), both windows rendered with DrawToBitmap. Process finder + 15 s Kill fallback on a renamed ping.exe (also as BtrfsUsbMounter.exe); quit message on a hidden WinForms stand-in: closed in 0.1 s, exit 0. NOT run: a real elevated install / update / uninstall, the real app handling the quit message, `--unmount-all` through a pipe._
+
+- **installer/Setup.cs** (+ `setup.manifest`): one WinForms exe, compiled by the new BuildSetup target like the .com;
+  the program files are `payload/...` resources (csproj `SetupPayload`). Install to any folder (default
+  `%ProgramFiles%\Linux_USB`), all-users Start menu / desktop shortcuts, optional system PATH, Installed apps entry,
+  copies itself as `Uninstall.exe`; update in place or move (old folder removed, logon task re-pointed); closes a
+  running copy (quit message, 15 s, Kill) and, if the user agrees, copies running from other folders.
+- **Uninstall:** re-runs from %TEMP%; warns when the app runs or drives are mounted; closes it; `--unmount-all` through a
+  pipe (not while another copy runs elsewhere); asks before going on with drives still mounted; removes logon task
+  (if it starts this copy), shortcuts, PATH, registry, its own files (user files and then the folder stay); settings
+  folder only if ticked.
+- **App:** `LinuxUsbMounter.Quit` window message (MainForm exits without prompts, cancels the running job, drives stay
+  mounted); CLI writes to a redirected stdout (pipe / file) instead of opening a console that waits for Enter.
+- **Portable:** BuildPortableZip target zips the net48 folder.
+- **Icon v3 + no name in Installed apps** (user requests: "take my name off of the uninstaller entry"; "rebuild
+  everything to use the icon LinuxUsbMount_v3.ico ... It is Tux only. Give credit where necessary"): `ApplicationIcon`
+  → `assets\LinuxUsbMount_v3.ico` (user-supplied: the drive with classic Tux on a green badge; 10 frames 16-256, 32-bit
+  DIB) + `LinuxUsbMount_2048_v3.png`. exe, .com and setup embed it pixel-exact (32 px compared); the exe inside the setup
+  and the zip is the rebuilt one (SHA-256). v2 (a badge found through a Google search with Tux, the BSD daemon and Duke:
+  unknown rights) was dropped before it was ever committed; its files stay untracked in `assets/`. The uninstall entry
+  no longer writes `Publisher` (and deletes an old one); the setup has no AssemblyCompany; the copyright notice stays
+  (license). README License section: credits for Tux (Larry Ewing, The GIMP) and the Linux trademark line. The v1
+  `LinuxUsbMount.ico` / `_2048.png` are still in `assets/`, unused.
+- **Docs:** README (intro, Build, Install with an installer-vs-portable table, Installer, Uninstall, Portable,
+  PowerShell / old-name upgrades, Command line, Project layout, Troubleshooting); step 1 and troubleshooting in all 9
+  docs/distros guides; CLAUDE.md (Commands, Architecture, installer verification).
+- **Files.** `installer/Setup.cs`, `installer/setup.manifest`, `LinuxUsbMounter.csproj`, `src/Program.cs`,
+  `src/UI/MainForm.cs`, `README.md`, `docs/distros/*.md`, `CLAUDE.md`, `RESUME.md`, this file.
+
+---
+
+## `72f1f60` — **NEW APP ICON: assets/LinuxUsbMount.ico REPLACES THE OLD BTRFS "b" app.ico.** _2026-09-26. Evidence: user request ("I put an Icon LinuxUsbMount.ico created in another Claude session in the assets folder. Please use this icon"). The .ico is well formed: 10 frames 16/20/24/32/40/48/64/96/128/256, all 32-bit DIB, all inside the file; every frame previewed on light and dark backgrounds. `dotnet build -c Release`: 0 warnings, 0 errors. Embedded 32 px icon of LinuxUsbMounter.exe and of the .com (read through a renamed copy: the shell won't extract icons from a .com) matches the .ico pixel for pixel. Not seen in the running app's tray / title bar (needs an elevated launch)._
 
 - **Icon:** dark drive with a blue USB trident, amber activity light, USB plug on top, green folder-tree badge ("filesystem
   attached"). `LinuxUsbMount_2048.png` is the same art at 2048 x 2048.

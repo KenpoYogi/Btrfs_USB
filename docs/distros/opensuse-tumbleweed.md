@@ -136,8 +136,13 @@ you installed those options.
 
 ## Step 5: Use it with Linux USB Mounter
 
-1. Copy the whole program folder (with `tools\` and `LICENSE`) somewhere permanent and start
-   `LinuxUsbMounter.exe`. Click **Yes** when Windows asks for administrator rights.
+1. Get the app one of two ways (see [Install](../../README.md#install)):
+   - **Installer:** run `LinuxUsbMounter-<version>-Setup.exe` (default folder `C:\Program Files\Linux_USB`)
+     and let it start the app, or open **Linux USB Mounter** from the Start menu later.
+   - **Portable:** extract `LinuxUsbMounter-<version>-Portable.zip` to any folder and start
+     `LinuxUsbMounter.exe` there. Nothing is installed.
+
+   Click **Yes** when Windows asks for administrator rights.
 2. In the **WSL2 distro** box at the top, pick **openSUSE-Tumbleweed**. To make it the default for
    everything, run `wsl --set-default openSUSE-Tumbleweed` once.
 3. Plug in the USB drive. It appears in the list; select it and click **Mount**.
@@ -145,7 +150,7 @@ you installed those options.
    at `\\wsl.localhost\openSUSE-Tumbleweed\mnt\wsl\<label>`.
 5. Always **Eject** in the app before unplugging, so all data is written to the drive.
 
-To test from the command line, open an administrator terminal in the program folder and run
+To test from the command line, open an administrator terminal in the program folder (`C:\Program Files\Linux_USB` when installed, or your portable folder) and run
 `.\LinuxUsbMounter --list`.
 
 ## Troubleshooting
@@ -157,7 +162,7 @@ To test from the command line, open an administrator terminal in the program fol
 | Status says *Needs tools* (Mac or ZFS drives) | Mac: `zypper install -y libfsapfs`; ZFS: install `zfs` (Step 3). Then click **Refresh** |
 | Status says *No driver* | Run **Tools > Build filesystem drivers** (again, after a `wsl --update`) |
 | A UFS drive stays *Ready (read-only)* | Tick **Tools > Allow UFS writes**, after building the drivers. Solaris UFS, and drives that were not cleanly unmounted, always open read-only (the log says which): run `fsck_ffs` on the BSD system and eject it there |
-| "The driver build script is missing" | Copy the `tools\` folder next to `LinuxUsbMounter.exe` |
+| "The driver build script is missing" | Installer: run the setup again. Portable: extract the `tools\` folder from the zip next to `LinuxUsbMounter.exe` |
 | `zypper` says a repository key is not trusted | Run `zypper --gpg-auto-import-keys refresh` |
 | Anything else | **Tools > Open log file**, or `%LOCALAPPDATA%\BtrfsUsbMounter\mounter.log` |
 

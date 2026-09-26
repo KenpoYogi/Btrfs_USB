@@ -104,6 +104,9 @@ namespace LinuxUsbMounter
 
         public static readonly int ShowMessage = RegisterWindowMessage("BtrfsUsbMounter.ShowWindow");
 
+        /// <summary>Posted by the installer / uninstaller to a copy running from the install folder: exit now, no prompts.</summary>
+        public static readonly int QuitMessage = RegisterWindowMessage("LinuxUsbMounter.Quit");
+
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern int RegisterWindowMessage(string message);
 
@@ -310,10 +313,34 @@ namespace LinuxUsbMounter
         [DllImport("kernel32.dll")]
         private static extern bool FreeConsole();
 
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetStdHandle(int stdHandle);
+
+        [DllImport("kernel32.dll")]
+        private static extern int GetFileType(IntPtr handle);
+
+        private const int StdOutputHandle = -11;
+        private const int FileTypeDisk = 1;
+        private const int FileTypePipe = 3;
+
         private static bool ownConsole;
+
+        /// <summary>
+        /// Standard output was handed over as a pipe or file (the installer runs --unmount-all that way, or
+        /// "LinuxUsbMounter --list > file"). Console.IsOutputRedirected can't tell: it is also true for a GUI
+        /// process that has no output handle at all.
+        /// </summary>
+        private static bool OutputRedirected()
+        {
+            IntPtr h = GetStdHandle(StdOutputHandle);
+            if (h == IntPtr.Zero || h == new IntPtr(-1)) return false;
+            int type = GetFileType(h);
+            return type == FileTypeDisk || type == FileTypePipe;
+        }
 
         private static void OpenConsole()
         {
+            if (OutputRedirected()) return;   // write to the pipe / file; no console, no "Press Enter"
             if (AttachConsole(AttachParentProcess)) return;
             AllocConsole();
             ownConsole = true;   // started without a console (e.g. elevated from a non-admin prompt)
