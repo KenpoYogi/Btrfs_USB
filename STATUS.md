@@ -8,7 +8,22 @@
 
 ---
 
-## ⭐ (this commit) — **v2 ICON FILES DELETED.** _2026-09-26. Evidence: user request ("delete the v2 files, commit and sync"). `assets/LinuxUsbMount_v2.ico` and `assets/LinuxUsbMount_2048_v2.png` (the Google-sourced badge, unknown rights) were never committed; deleted from disk, so `assets/` holds v1 (unused) and v3 (in use). Only this file and RESUME.md change._
+## ⭐ (this commit) — **2.1.0: SETUP CHECKS WSL2 / LINUX AND OFFERS TO SET IT UP (openSUSE TUMBLEWEED, UBUNTU 26.04, KALI).** _2026-09-26. Evidence: user request ("check for a properly configured Linux in WSL2 and if it is not there, prompt user to either manually install first (point to distro docs), OR have them select either openSUSE-Tumbleweed, Ubuntu, or Kali Linux for installation with all necessary packages. Increment the version to 2.1.0"; then "openSUSE is still the default. The Ubuntu choice will install 26.04"). `wsl --list --online` on the dev PC: names Ubuntu-26.04, openSUSE-Tumbleweed, kali-linux. `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.1.0-Setup.exe / -Portable.zip. Against real WSL 2.7.14 (non-elevated, loading the setup exe by reflection): Check found Tumbleweed ready in 3.8 s; Kali with btrfs-progs removed → reported missing and fixable, InstallPackages reinstalled only btrfs-progs; fresh Ubuntu-26.04 via InstallDistro + InstallPackages(fresh): registered with --no-launch in 15 s as WSL2, 93 packages upgraded + btrfs-progs, default user root, ready, 52 s, then unregistered; zypper package step on Tumbleweed (first version installed present packages and so upgraded util-linux 2.42.2 → 2.42.3; changed to missing-only, re-run: "already has" and nothing done). Dialog rendered for no-WSL, no-distro and fixable+WSL1. Also found: the user's real 2.0.0 install in C:\Apps\Linux_USB is correct (Installed apps entry without Publisher, 7 files, Start menu .lnk, logon task). NOT run: WSL install (restart) and `wsl --update` paths, fresh Tumbleweed / Kali, dnf / pacman, the 2.1.0 setup elevated._
+
+- **installer/Setup.cs:** `WslRunner` (wsl.exe with WSL_UTF8=1, time limit, streamed lines minus progress bars),
+  `LinuxSetup` (Check, InstallWsl, UpdateWsl, InstallDistro, InstallPackages, SetDefault), `LinuxSetupDialog`, and the
+  Linux step in InstallForm after the files are copied (checkbox, on by default; a pending restart skips starting the
+  program). Uninstall's closing line says WSL distros are left in place (`wsl --unregister`).
+- **Version 2.1.0:** csproj `<Version>`, app.manifest and setup.manifest assemblyIdentity.
+- **Docs:** README Installer section (Linux check and its choices), docs/distros/README.md (let the installer do it),
+  a Shortcut tip in the Tumbleweed / Ubuntu (setup installs 26.04) / Kali guides, CLAUDE.md (design + verification).
+- **Files.** `installer/Setup.cs`, `installer/setup.manifest`, `app.manifest`, `LinuxUsbMounter.csproj`, `README.md`,
+  `docs/distros/README.md`, `docs/distros/opensuse-tumbleweed.md`, `docs/distros/ubuntu.md`, `docs/distros/kali.md`,
+  `CLAUDE.md`, `RESUME.md`, this file.
+
+---
+
+## `5e0028c` — **v2 ICON FILES DELETED.** _2026-09-26. Evidence: user request ("delete the v2 files, commit and sync"). `assets/LinuxUsbMount_v2.ico` and `assets/LinuxUsbMount_2048_v2.png` (the Google-sourced badge, unknown rights) were never committed; deleted from disk, so `assets/` holds v1 (unused) and v3 (in use). Only this file and RESUME.md change._
 
 ---
 

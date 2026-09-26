@@ -79,6 +79,21 @@ Run **`LinuxUsbMounter-<version>-Setup.exe`** and click **Yes** when Windows ask
   The shortcuts are for all users.
 - The program is registered in **Settings > Apps > Installed apps**, and setup copies itself into the
   folder as `Uninstall.exe`.
+- **Linux check** (on by default): after copying the files, setup checks that WSL is installed and current
+  and that a WSL2 distribution has the tools the program needs (`btrfs`, `blkid`, `modinfo`). If none does,
+  it explains what is missing and offers to:
+  - **install WSL** (`wsl --install --no-distribution`; Windows then needs a restart, after which you run
+    setup again), or **update an old WSL** (`wsl --update`);
+  - **install a distribution for you: openSUSE Tumbleweed** (recommended, pre-selected), **Ubuntu 26.04 LTS**
+    or **Kali Linux**. Setup installs it, brings it up to date and adds `btrfs-progs`, `util-linux` and
+    `kmod` (plus `libfsapfs` on openSUSE, for Mac drives), all as root, so no Linux user account is needed
+    (open the distribution from the Start menu later if you want one). Optionally it becomes the default
+    WSL distribution. This downloads a few hundred MB and takes about 5 to 20 minutes;
+  - **add just the missing packages** to a distribution you already have (zypper, apt, dnf or pacman);
+  - or let you **set it up yourself**: it opens the [step-by-step guides](docs/distros/README.md).
+
+  The extra filesystem drivers (JFS, HFS+, UFS, ZFS, APFS read/write) are built later from the program:
+  **Tools > Build filesystem drivers**.
 - The program is not code-signed, so Windows SmartScreen may warn once about an unknown publisher
   (**More info > Run anyway**).
 

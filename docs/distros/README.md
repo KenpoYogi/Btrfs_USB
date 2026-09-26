@@ -5,6 +5,12 @@ into Windows. WSL2 needs a Linux distribution ("distro") installed. The drives a
 Microsoft's WSL kernel, which is the same for every distro. The distro supplies the tools the app
 runs, like `btrfs`, `blkid` and `fsapfsmount`. That is why some features depend on the distro.
 
+**Easiest: let the installer do it.** `LinuxUsbMounter-<version>-Setup.exe` checks WSL2 after installing the
+program. If no distro is ready, it can install WSL, and then **openSUSE Tumbleweed**, **Ubuntu 26.04 LTS** or
+**Kali Linux** with the packages from Step 3 of their guides, or add just the missing packages to a distro you
+already have (see the [README](../../README.md#installer)). The guides below are for doing it by hand, for the
+other distros, and for the optional extras (ZFS, the extra drivers).
+
 **Not sure? Pick [openSUSE Tumbleweed](opensuse-tumbleweed.md).** It is the distro the app is
 developed on. The extra drivers from **Tools > Build filesystem drivers** are tested on Tumbleweed
 and on [Kali](kali.md). The build works with zypper (openSUSE, SLES) and apt (Debian, Kali, Ubuntu);

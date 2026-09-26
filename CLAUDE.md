@@ -70,7 +70,21 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   added); moving re-points the logon task. Uninstall: Uninstall.exe re-runs itself from %TEMP% (`/uninstall /from
   <dir>`, deletes itself after), closes the app, `--unmount-all` if state.json has mounts (skipped while a copy from
   another folder runs), asks before going on if drives stay mounted, removes task (only if it starts this copy),
-  shortcuts, PATH, registry, files; settings folder only if ticked
+  shortcuts, PATH, registry, files; settings folder only if ticked. The Installed apps entry has no Publisher (user
+  request: no personal name there)
+- Setup's Linux check (2.1.0, `LinuxSetup` / `LinuxSetupDialog`, checkbox on by default, runs after the files are in
+  place): `wsl --version` (fails = inbox WSL too old; `--status` fails too = not installed), `wsl --list --verbose`
+  (WSL_UTF8=1, docker-desktop ignored, WSL1 reported), then per WSL2 distro, default first, as root: `command -v btrfs
+  blkid modinfo`, package manager (zypper / apt-get / dnf / pacman), /etc/os-release; stops at the first ready one
+  (boots the VM: fine in setup). Choices: install WSL (`--install --no-distribution`, restart, run setup again), update
+  WSL, add ONLY the missing packages to an existing distro (installing a present package upgrades it: zypper upgraded
+  util-linux on the dev Tumbleweed that way before this rule), or install a new distro: openSUSE-Tumbleweed (default,
+  pre-selected), Ubuntu-26.04 (user decision: the Ubuntu choice is 26.04), kali-linux. New distro: `wsl --install -d
+  NAME --no-launch` (registers right away on WSL 2.7; fallback `<launcher>.exe install --root`; WSL1 converted), then
+  full update (zypper dup / apt upgrade, Kali full-upgrade / dnf upgrade / pacman -Syu) + btrfs-progs (btrfsprogs on
+  zypper) util-linux kmod, optional libfsapfs (openSUSE) / libfsapfs-utils (Ubuntu 24.04 only; not 26.04). Runs as root,
+  no Linux user / OOBE; optional `wsl --set-default`. Scripts go through `wsl -d X -u root --exec sh -c "<script>"`:
+  keep them free of double quotes. Progress-bar lines are filtered from the log. Guides link: GitHub docs/distros
 
 ## Filesystems
 - User docs (README, docs/distros, --help, menu and dialog texts) do NOT mention ReiserFS or Reiser4 (user decision
@@ -208,12 +222,19 @@ Same convention as VariableDrive / FeatureRecognition: two files at the repo roo
   rewrite or truncate. An entry goes in with its own commit, headed `(this commit)`; the next change puts the hash in
 - If either looks reverted or shrunk on disk: `git checkout HEAD -- RESUME.md STATUS.md`
 
-## Installer verification (2026-09-26, non-elevated session)
+## Installer verification (2026-09-26)
 Loaded the setup exe by reflection: path checks, payload extract (all 6 files byte-identical to the build, Uninstall.exe
 = the setup), .lnk target/icon, removal keeps user files and the folder, state.json read, logon task query, window
 layout (DrawToBitmap). Process finder + Kill fallback against a renamed ping.exe; quit message against a hidden
-WinForms stand-in (closed in 0.1 s). NOT run: a real elevated install / update / uninstall (HKLM, Program Files,
-all-users shortcuts, PATH), the real app answering the quit message, `--unmount-all` through the pipe
+WinForms stand-in (closed in 0.1 s). The user then ran the 2.0.0 setup for real (elevated) into C:\Apps\Linux_USB:
+Installed apps entry (no Publisher, UninstallString, DisplayIcon, Lum* values), 7 files, all-users Start menu .lnk and
+the logon task pointing at the installed exe all verified afterwards (2026-09-26). NOT verified: update / uninstall,
+the real app answering the quit message, `--unmount-all` through the pipe.
+Linux check (2.1.0, non-elevated is enough for WSL): Check on the dev PC (Tumbleweed ready, 3.8 s); fix path on the
+Kali test distro (btrfs-progs removed, detected, only it reinstalled); fresh `Ubuntu-26.04` through InstallDistro +
+InstallPackages(fresh): registered with --no-launch in 15 s, 93 packages upgraded + btrfs-progs, default user root,
+52 s total, then unregistered. Dialog rendered in the no-WSL / no-distro / fixable+WSL1 states. NOT run: installing WSL
+itself (restart path), `wsl --update` path, Tumbleweed / Kali fresh installs, dnf / pacman scripts
 
 ## Verification done before handover
 Compiles against the 4.8 reference assemblies; 32 core tests passed under Mono (superblock

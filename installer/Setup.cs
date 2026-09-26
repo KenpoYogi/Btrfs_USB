@@ -948,7 +948,8 @@ namespace LinuxUsbMounter.Setup
                     log("Could not delete " + Product.DataDir + ": " + ex.Message);
                 }
             }
-            log("Done. Filesystem drivers built inside your WSL distributions (/var/lib/wsl-modules) were left in place.");
+            log("Done. WSL and its Linux distributions were left in place, including any setup installed and the filesystem drivers " +
+                "built inside them (/var/lib/wsl-modules). \"wsl --unregister <name>\" removes a distribution and everything in it.");
             return true;
         }
 
@@ -977,6 +978,351 @@ namespace LinuxUsbMounter.Setup
                 p.WaitForExit();   // no time limit (the program times out its own WSL calls; a flush must finish). Also drains the output events
                 return p.ExitCode;
             }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    //  WSL2 and a Linux distribution with the packages the program needs
+    // ---------------------------------------------------------------------------------------
+    internal sealed class WslResult
+    {
+        public int ExitCode;
+        public string Output;
+    }
+
+    /// <summary>Runs wsl.exe with a time limit; output lines can be streamed to the log.</summary>
+    internal static class WslRunner
+    {
+        // progress bars and counters ("[====  42.0%  ]", "(Reading database ... 35%"): noise in the log
+        private static readonly Regex Progress = new Regex(@"^\[?[\s=#\-]*\d+(\.\d+)?\s*%|\d%\s*\]?\s*$");
+
+        public static string Exe
+        {
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "wsl.exe"); }
+        }
+
+        public static WslResult Run(string arguments, int timeoutSeconds, Action<string> onLine)
+        {
+            return RunProgram(Exe, arguments, timeoutSeconds, onLine);
+        }
+
+        public static WslResult RunProgram(string exe, string arguments, int timeoutSeconds, Action<string> onLine)
+        {
+            var psi = new ProcessStartInfo(exe, arguments)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+            psi.EnvironmentVariables["WSL_UTF8"] = "1";   // wsl.exe's own messages in UTF-8, not UTF-16
+            var output = new StringBuilder();
+            object gate = new object();
+            using (var p = new Process { StartInfo = psi })
+            {
+                DataReceivedEventHandler relay = (s, e) =>
+                {
+                    if (e.Data == null) return;
+                    string line = e.Data.Replace("\0", string.Empty).Replace(((char)0xFEFF).ToString(), string.Empty).Trim();
+                    lock (gate) output.AppendLine(line);
+                    if (onLine != null && line.Length > 0 && !Progress.IsMatch(line)) onLine("  " + line);
+                };
+                p.OutputDataReceived += relay;
+                p.ErrorDataReceived += relay;
+                p.Start();
+                p.BeginOutputReadLine();
+                p.BeginErrorReadLine();
+                if (!p.WaitForExit(timeoutSeconds * 1000))
+                {
+                    try { p.Kill(); } catch { }
+                    throw new TimeoutException(Path.GetFileName(exe) + " " + arguments + " did not finish within " + (timeoutSeconds / 60) + " minutes.");
+                }
+                p.WaitForExit();
+                lock (gate) return new WslResult { ExitCode = p.ExitCode, Output = output.ToString().Trim() };
+            }
+        }
+
+        public static string LastLines(string text, int count)
+        {
+            string[] lines = (text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            return string.Join(" ", lines.Skip(Math.Max(0, lines.Length - count)));
+        }
+    }
+
+    internal sealed class DistroChoice
+    {
+        public string Name;        // wsl --install -d NAME
+        public string Title;
+        public string Launcher;    // Store app launcher, only needed when --no-launch leaves it unregistered
+
+        public DistroChoice(string name, string title, string launcher) { Name = name; Title = title; Launcher = launcher; }
+    }
+
+    internal sealed class DistroInfo
+    {
+        public string Name;
+        public int Version;
+        public bool IsDefault;
+        public bool Checked;
+        public string Error;
+        public string PackageManager;   // zypper, apt-get, dnf, pacman
+        public string OsId;
+        public string OsVersion;
+        public readonly List<string> Missing = new List<string>();
+
+        public bool Ready { get { return Checked && Error == null && Missing.Count == 0; } }
+        public bool Fixable { get { return Checked && Error == null && Missing.Count > 0 && PackageManager != null; } }
+    }
+
+    internal sealed class LinuxStatus
+    {
+        public bool WslInstalled;
+        public bool WslCurrent;   // the Store WSL (wsl --version works)
+        public readonly List<DistroInfo> Distros = new List<DistroInfo>();
+        public DistroInfo Ready;
+        public readonly List<string> Problems = new List<string>();
+
+        public IEnumerable<DistroInfo> Wsl2 { get { return Distros.Where(d => d.Version == 2); } }
+    }
+
+    internal static class LinuxSetup
+    {
+        public const string GuidesUrl = "https://github.com/KenpoYogi/Btrfs_USB/blob/main/docs/distros/README.md";
+
+        // first = default choice: openSUSE Tumbleweed (as in the guides); the Ubuntu choice is 26.04 (user decision 2026-09-26)
+        public static readonly DistroChoice[] Choices =
+        {
+            new DistroChoice("openSUSE-Tumbleweed", "openSUSE Tumbleweed (recommended)", "openSUSE-Tumbleweed.exe"),
+            new DistroChoice("Ubuntu-26.04", "Ubuntu 26.04 LTS", "ubuntu2604.exe"),
+            new DistroChoice("kali-linux", "Kali Linux", "kali.exe"),
+        };
+
+        private static readonly Regex ListLine = new Regex(@"^\s*(\*)?\s*(\S+)\s+(\S+)\s+([12])\s*$");
+
+        // tools the program runs in the distro, and the package that has each (Debian/Ubuntu names; zypper: btrfsprogs)
+        private static readonly string[][] Tools = { new[] { "btrfs", "btrfs-progs" }, new[] { "blkid", "util-linux" }, new[] { "modinfo", "kmod" } };
+
+        private const string CheckScript =
+            "for c in btrfs blkid modinfo; do command -v $c >/dev/null 2>&1 || echo missing $c; done; " +
+            "for m in zypper apt-get dnf pacman; do if command -v $m >/dev/null 2>&1; then echo pm $m; break; fi; done; " +
+            ". /etc/os-release 2>/dev/null; echo os $ID $VERSION_ID";
+
+        private static string RootShell(string distro, string script)
+        {
+            // the script has no double quotes, so wrapping it in them is enough for wsl.exe's parser
+            return "-d " + distro + " -u root --exec sh -c \"" + script + "\"";
+        }
+
+        /// <summary>The package that has <paramref name="tool"/>; openSUSE spells btrfs-progs "btrfsprogs".</summary>
+        public static string PackageFor(string tool, string packageManager = null)
+        {
+            string[] t = Tools.FirstOrDefault(x => x[0] == tool);
+            string package = t != null ? t[1] : tool;
+            return packageManager == "zypper" && package == "btrfs-progs" ? "btrfsprogs" : package;
+        }
+
+        private static List<DistroInfo> List()
+        {
+            var list = new List<DistroInfo>();
+            WslResult r = WslRunner.Run("--list --verbose", 60, null);
+            if (r.ExitCode != 0) return list;
+            foreach (string line in r.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                Match m = ListLine.Match(line);
+                if (!m.Success || m.Groups[2].Value.StartsWith("docker-desktop", StringComparison.OrdinalIgnoreCase)) continue;
+                list.Add(new DistroInfo { Name = m.Groups[2].Value, IsDefault = m.Groups[1].Success, Version = int.Parse(m.Groups[4].Value) });
+            }
+            return list;
+        }
+
+        private static void CheckDistro(DistroInfo d)
+        {
+            WslResult r = WslRunner.Run(RootShell(d.Name, CheckScript), 180, null);
+            d.Checked = true;
+            if (r.ExitCode != 0)
+            {
+                d.Error = "could not start it (" + WslRunner.LastLines(r.Output, 2) + ")";
+                return;
+            }
+            d.Missing.Clear();
+            foreach (string line in r.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] w = line.Trim().Split(' ');
+                if (w.Length >= 2 && w[0] == "missing") d.Missing.Add(w[1]);
+                else if (w.Length >= 2 && w[0] == "pm") d.PackageManager = w[1];
+                else if (w.Length >= 2 && w[0] == "os") { d.OsId = w[1]; d.OsVersion = w.Length >= 3 ? w[2] : string.Empty; }
+            }
+        }
+
+        /// <summary>
+        /// Is WSL installed and current, and does a WSL2 distro have btrfs, blkid and modinfo? Starting a distro boots the
+        /// WSL VM, which is fine here: setup runs once.
+        /// </summary>
+        public static LinuxStatus Check(Action<string> log)
+        {
+            var s = new LinuxStatus();
+            log("Checking WSL2 and Linux...");
+            if (!File.Exists(WslRunner.Exe))
+            {
+                s.Problems.Add("WSL is not installed on this PC.");
+                return s;
+            }
+            WslResult version = WslRunner.Run("--version", 60, null);
+            if (version.ExitCode == 0)
+            {
+                s.WslInstalled = s.WslCurrent = true;
+                log("  " + WslRunner.LastLines(version.Output.Split('\n')[0], 1));
+            }
+            else
+            {
+                s.WslInstalled = WslRunner.Run("--status", 60, null).ExitCode == 0;
+                if (!s.WslInstalled)
+                {
+                    s.Problems.Add("WSL is not installed on this PC.");
+                    return s;
+                }
+                s.Problems.Add("WSL is too old (it has no \"wsl --version\"). It needs the current WSL from \"wsl --update\".");
+                return s;
+            }
+
+            s.Distros.AddRange(List());
+            foreach (DistroInfo d in s.Distros.Where(x => x.Version == 1))
+                s.Problems.Add(d.Name + " runs as WSL1; the program needs WSL2 (\"wsl --set-version " + d.Name + " 2\" converts it).");
+            if (!s.Wsl2.Any())
+            {
+                s.Problems.Add("No WSL2 Linux distribution is installed.");
+                return s;
+            }
+            foreach (DistroInfo d in s.Wsl2.OrderByDescending(x => x.IsDefault))
+            {
+                log("  checking " + d.Name + "...");
+                CheckDistro(d);
+                if (d.Ready)
+                {
+                    s.Ready = d;
+                    log("  " + d.Name + ": ready (btrfs, blkid and modinfo found).");
+                    return s;
+                }
+                s.Problems.Add(d.Error != null ? d.Name + ": " + d.Error + "."
+                    : d.Name + " is missing " + string.Join(", ", d.Missing.Select(t => t + " (package " + PackageFor(t, d.PackageManager) + ")")) + ".");
+            }
+            return s;
+        }
+
+        /// <summary>wsl --install --no-distribution. True when Windows must restart before WSL works.</summary>
+        public static bool InstallWsl(Action<string> log)
+        {
+            log("Installing WSL (wsl --install --no-distribution)...");
+            WslResult r = WslRunner.Run("--install --no-distribution", 1800, log);
+            if (r.ExitCode != 0 && r.ExitCode != 3010)
+                throw new InvalidOperationException("wsl --install failed (exit " + r.ExitCode + "): " + WslRunner.LastLines(r.Output, 3));
+            bool restart = r.ExitCode == 3010 || Regex.IsMatch(r.Output, "restart|reboot", RegexOptions.IgnoreCase);
+            if (!restart) WslRunner.Run("--set-default-version 2", 60, log);
+            return restart;
+        }
+
+        public static void UpdateWsl(Action<string> log)
+        {
+            log("Updating WSL (wsl --update)...");
+            WslResult r = WslRunner.Run("--update", 1800, log);
+            if (r.ExitCode != 0) throw new InvalidOperationException("wsl --update failed (exit " + r.ExitCode + "): " + WslRunner.LastLines(r.Output, 3));
+            WslRunner.Run("--set-default-version 2", 60, log);
+        }
+
+        /// <summary>wsl --install -d NAME --no-launch, as WSL2. The program runs as root, so no Linux user is created.</summary>
+        public static void InstallDistro(DistroChoice c, Action<string> log)
+        {
+            log("Installing " + c.Title.Replace(" (recommended)", string.Empty) + " (downloads a few hundred MB)...");
+            WslResult r = WslRunner.Run("--install -d " + c.Name + " --no-launch", 1800, log);
+            if (r.ExitCode != 0)
+                throw new InvalidOperationException("wsl --install -d " + c.Name + " failed (exit " + r.ExitCode + "): " + WslRunner.LastLines(r.Output, 3));
+
+            DistroInfo d = List().FirstOrDefault(x => string.Equals(x.Name, c.Name, StringComparison.OrdinalIgnoreCase));
+            if (d == null)
+            {
+                // an older Store package registers only when first launched: its launcher can do that with root as the user
+                string launcher = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", c.Launcher);
+                if (File.Exists(launcher))
+                {
+                    log("Registering " + c.Name + " (" + c.Launcher + " install --root)...");
+                    WslRunner.RunProgram(launcher, "install --root", 1800, log);
+                    d = List().FirstOrDefault(x => string.Equals(x.Name, c.Name, StringComparison.OrdinalIgnoreCase));
+                }
+            }
+            if (d == null)
+                throw new InvalidOperationException(c.Name + " was downloaded but is not registered yet. Open it once from the Start menu, " +
+                                                    "then run this setup again to add the packages.");
+            if (d.Version == 1)
+            {
+                log("Converting " + c.Name + " to WSL2...");
+                WslResult v = WslRunner.Run("--set-version " + c.Name + " 2", 1800, log);
+                if (v.ExitCode != 0) throw new InvalidOperationException("wsl --set-version " + c.Name + " 2 failed: " + WslRunner.LastLines(v.Output, 3));
+            }
+            log(c.Name + " is installed.");
+        }
+
+        /// <summary>
+        /// Fresh distro (<paramref name="fresh"/>: this setup just installed it): updates it, installs the packages for btrfs,
+        /// blkid and modinfo and the optional APFS reader. Existing distro: installs only the packages for the missing tools,
+        /// nothing else (installing a present package would also upgrade it). As root; then checks again.
+        /// </summary>
+        public static void InstallPackages(string distro, bool fresh, Action<string> log)
+        {
+            var d = new DistroInfo { Name = distro };
+            CheckDistro(d);
+            if (d.Error != null) throw new InvalidOperationException(distro + ": " + d.Error);
+            if (!fresh && d.Missing.Count == 0)
+            {
+                log(distro + " already has btrfs, blkid and modinfo.");
+                return;
+            }
+            if (d.PackageManager == null) throw new InvalidOperationException(distro + " has none of zypper, apt-get, dnf or pacman; install btrfs-progs, util-linux and kmod by hand.");
+
+            string pm = d.PackageManager;
+            List<string> packages = (fresh ? Tools.Select(t => t[0]) : d.Missing).Select(t => PackageFor(t, pm)).Distinct().ToList();
+            string names = string.Join(" ", packages);
+            string script;
+            switch (pm)
+            {
+                case "zypper":
+                    script = "zypper --non-interactive --gpg-auto-import-keys refresh" +
+                             (fresh ? " && zypper --non-interactive dup" : string.Empty) +
+                             " && zypper --non-interactive install " + names +
+                             (fresh ? "; zypper --non-interactive install libfsapfs || echo optional package libfsapfs not installed" : string.Empty);
+                    break;
+                case "apt-get":
+                    // Kali is rolling: full-upgrade, as its guide says. libfsapfs-utils works on Ubuntu 24.04 only (not 26.04)
+                    string upgrade = d.OsId == "kali" ? "full-upgrade" : "upgrade";
+                    bool apfs = fresh && d.OsId == "ubuntu" && d.OsVersion == "24.04";
+                    script = "export DEBIAN_FRONTEND=noninteractive; O='-q -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'; " +
+                             "apt-get -q update" +
+                             (fresh ? " && apt-get $O " + upgrade : string.Empty) +
+                             " && apt-get $O install " + names +
+                             (apfs ? "; apt-get $O install libfsapfs-utils || echo optional package libfsapfs-utils not installed" : string.Empty);
+                    break;
+                case "dnf":
+                    script = (fresh ? "dnf -y upgrade && " : string.Empty) + "dnf -y install " + names;
+                    break;
+                default:
+                    script = "pacman -Sy" + (fresh ? "u" : string.Empty) + " --noconfirm --needed " + names;
+                    break;
+            }
+            log((fresh ? "Updating " + distro + " and installing " : "Installing into " + distro + ": ") + string.Join(", ", packages) +
+                " (this can take a while)...");
+            WslResult r = WslRunner.Run(RootShell(distro, script), 3600, log);
+
+            CheckDistro(d);
+            if (!d.Ready)
+                throw new InvalidOperationException("The packages could not be installed (exit " + r.ExitCode + "). " + distro + " is still missing " +
+                                                    string.Join(", ", d.Missing) + ". See the guides for doing it by hand.");
+            log(distro + " is ready: btrfs, blkid and modinfo found.");
+        }
+
+        public static void SetDefault(string distro, Action<string> log)
+        {
+            if (WslRunner.Run("--set-default " + distro, 60, null).ExitCode == 0) log(distro + " is now the default WSL distribution.");
         }
     }
 
@@ -1116,7 +1462,7 @@ namespace LinuxUsbMounter.Setup
     {
         private readonly Installation existing = Installation.Find();
         private readonly TextBox dirBox;
-        private readonly CheckBox startMenu, desktop, addToPath, launch;
+        private readonly CheckBox startMenu, desktop, addToPath, launch, checkLinux;
         private readonly Button installButton, cancelButton, uninstallButton, browseButton;
         private bool finished;
 
@@ -1151,8 +1497,15 @@ namespace LinuxUsbMounter.Setup
                 AutoSize = true
             };
             launch = new CheckBox { Text = "Start " + Product.Name + " when setup finishes", Checked = true, AutoSize = true };
+            checkLinux = new CheckBox
+            {
+                Text = "Check the Linux setup in WSL2, and offer to set up a distribution if needed",
+                Checked = true,
+                AutoSize = true,
+                MaximumSize = new Size(566, 0)
+            };
             var options = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0, 0, 0, 6) };
-            options.Controls.AddRange(new Control[] { startMenu, desktop, addToPath, launch });
+            options.Controls.AddRange(new Control[] { startMenu, desktop, addToPath, launch, checkLinux });
             AddRow(options);
 
             var license = new LinkLabel
@@ -1300,7 +1653,7 @@ namespace LinuxUsbMounter.Setup
                 o.CloseOtherCopies = answer == DialogResult.Yes;
             }
 
-            foreach (Control c in new Control[] { dirBox, browseButton, startMenu, desktop, addToPath, launch, installButton, cancelButton })
+            foreach (Control c in new Control[] { dirBox, browseButton, startMenu, desktop, addToPath, launch, checkLinux, installButton, cancelButton })
                 c.Enabled = false;
             if (uninstallButton != null) uninstallButton.Visible = false;
 
@@ -1309,16 +1662,19 @@ namespace LinuxUsbMounter.Setup
             {
                 Log("FAILED: " + error.Message);
                 MessageBox.Show(this, "Setup failed: " + error.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                foreach (Control c in new Control[] { dirBox, browseButton, startMenu, desktop, addToPath, launch, installButton, cancelButton })
+                foreach (Control c in new Control[] { dirBox, browseButton, startMenu, desktop, addToPath, launch, checkLinux, installButton, cancelButton })
                     c.Enabled = true;
                 return;
             }
+
+            bool canStart = true;
+            if (checkLinux.Checked) canStart = await LinuxStepAsync();
 
             finished = true;
             installButton.Text = "Close";
             installButton.Enabled = true;
             cancelButton.Visible = false;
-            if (o.Launch)
+            if (o.Launch && canStart)
             {
                 try
                 {
@@ -1331,6 +1687,238 @@ namespace LinuxUsbMounter.Setup
                 }
             }
             installButton.Focus();
+        }
+
+        /// <summary>
+        /// Checks WSL2 and the distros; if none is ready, asks how to set one up and does it. False when Windows must
+        /// restart first (then starting the program is pointless).
+        /// </summary>
+        private async Task<bool> LinuxStepAsync()
+        {
+            for (int round = 0; round < 3; round++)
+            {
+                LinuxStatus status = null;
+                Exception error = await RunBusy(() => status = LinuxSetup.Check(Log));
+                if (error != null)
+                {
+                    Log("Could not check the Linux setup: " + error.Message);
+                    return true;
+                }
+                if (status.Ready != null)
+                {
+                    if (!status.Ready.IsDefault)
+                        Log("  " + status.Ready.Name + " is not the default WSL distribution: pick it in the program's \"WSL2 distro\" box.");
+                    return true;
+                }
+
+                LinuxChoice choice;
+                using (var dlg = new LinuxSetupDialog(status))
+                {
+                    if (dlg.ShowDialog(this) != DialogResult.OK)
+                    {
+                        Log("Linux setup skipped. The program needs a WSL2 distribution with btrfs-progs, util-linux and kmod: see " + LinuxSetup.GuidesUrl);
+                        return true;
+                    }
+                    choice = dlg.Choice;
+                }
+
+                if (choice.Action == LinuxAction.Manual)
+                {
+                    OpenGuides();
+                    Log("Opened the step-by-step guides: " + LinuxSetup.GuidesUrl);
+                    return true;
+                }
+
+                bool restart = false;
+                error = await RunBusy(() =>
+                {
+                    switch (choice.Action)
+                    {
+                        case LinuxAction.InstallWsl:
+                            restart = LinuxSetup.InstallWsl(Log);
+                            break;
+                        case LinuxAction.UpdateWsl:
+                            LinuxSetup.UpdateWsl(Log);
+                            break;
+                        case LinuxAction.NewDistro:
+                            LinuxSetup.InstallDistro(choice.Distro, Log);
+                            LinuxSetup.InstallPackages(choice.Distro.Name, true, Log);
+                            if (choice.SetDefault) LinuxSetup.SetDefault(choice.Distro.Name, Log);
+                            Log("To use " + choice.Distro.Name + " yourself, open it from the Start menu (it may ask you to create a Linux user).");
+                            break;
+                        case LinuxAction.FixDistro:
+                            LinuxSetup.InstallPackages(choice.Existing, false, Log);
+                            break;
+                    }
+                });
+                if (error != null)
+                {
+                    Log("FAILED: " + error.Message);
+                    MessageBox.Show(this, error.Message + "\r\n\r\nThe step-by-step guides show how to do it by hand:\r\n" + LinuxSetup.GuidesUrl,
+                                    Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return true;
+                }
+                if (restart)
+                {
+                    Log("Restart Windows to finish installing WSL, then run this setup again to add a Linux distribution.");
+                    MessageBox.Show(this, "WSL is installed. Restart Windows to finish, then run " + Product.SetupFileName +
+                                          " again (choose Update) to add a Linux distribution.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return false;
+                }
+                if (choice.Action != LinuxAction.UpdateWsl) return true;
+                // after a WSL update: check again, which offers the distros
+            }
+            return true;
+        }
+
+        public static void OpenGuides()
+        {
+            try { Process.Start(new ProcessStartInfo(LinuxSetup.GuidesUrl) { UseShellExecute = true }); } catch { }
+        }
+    }
+
+    internal enum LinuxAction { Manual, InstallWsl, UpdateWsl, NewDistro, FixDistro }
+
+    internal sealed class LinuxChoice
+    {
+        public LinuxAction Action;
+        public DistroChoice Distro;   // NewDistro
+        public string Existing;       // FixDistro
+        public bool SetDefault;
+    }
+
+    /// <summary>What to do when no WSL2 distro is ready: install WSL, add a distro, fix one, or set it up by hand.</summary>
+    internal sealed class LinuxSetupDialog : Form
+    {
+        private readonly List<KeyValuePair<RadioButton, LinuxChoice>> options = new List<KeyValuePair<RadioButton, LinuxChoice>>();
+        private readonly CheckBox makeDefault;
+
+        public LinuxChoice Choice { get; private set; }
+
+        public LinuxSetupDialog(LinuxStatus status)
+        {
+            Text = "Linux for " + Product.Name;
+            Font = new Font("Segoe UI", 9f);
+            AutoScaleDimensions = new SizeF(96f, 96f);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.CenterParent;
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+
+            var rows = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(16, 14, 16, 8) };
+            Action<Control> add = c =>
+            {
+                rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                rows.Controls.Add(c, 0, rows.RowCount++);
+            };
+            Func<string, float, FontStyle, Color, Label> label = (text, size, style, color) => new Label
+            {
+                Text = text,
+                AutoSize = true,
+                MaximumSize = new Size(540, 0),
+                Font = new Font("Segoe UI", size, style),
+                ForeColor = color,
+                Margin = new Padding(0, 2, 0, 6)
+            };
+
+            add(label(Product.Name + " needs a Linux distribution in WSL2", 12f, FontStyle.Bold, SystemColors.ControlText));
+            foreach (string p in status.Problems) add(label(char.ConvertFromUtf32(0x2022) + " " + p, 9f, FontStyle.Regular, Color.FromArgb(170, 70, 0)));
+            add(label("What should setup do?", 9f, FontStyle.Bold, SystemColors.ControlText));
+
+            makeDefault = new CheckBox
+            {
+                Text = "Make it the default WSL distribution",
+                AutoSize = true,
+                Checked = !status.Wsl2.Any(d => d.IsDefault),
+                Margin = new Padding(20, 0, 0, 6)
+            };
+
+            if (!status.WslInstalled)
+            {
+                AddOption(add, "Install WSL now", new LinuxChoice { Action = LinuxAction.InstallWsl },
+                          "Windows then needs a restart. Run this setup again afterwards (choose Update) to add a Linux distribution.");
+            }
+            else if (!status.WslCurrent)
+            {
+                AddOption(add, "Update WSL now (wsl --update)", new LinuxChoice { Action = LinuxAction.UpdateWsl },
+                          "Then setup checks again and offers the Linux distributions.");
+            }
+            else
+            {
+                foreach (DistroInfo d in status.Wsl2.Where(x => x.Fixable))
+                {
+                    AddOption(add, "Install the missing packages into " + d.Name + " (" +
+                                   string.Join(", ", d.Missing.Select(t => LinuxSetup.PackageFor(t, d.PackageManager)).Distinct()) + ")",
+                              new LinuxChoice { Action = LinuxAction.FixDistro, Existing = d.Name });
+                }
+                foreach (DistroChoice c in LinuxSetup.Choices.Where(c => !status.Distros.Any(d => string.Equals(d.Name, c.Name, StringComparison.OrdinalIgnoreCase))))
+                {
+                    AddOption(add, "Install " + c.Title + " with the packages it needs", new LinuxChoice { Action = LinuxAction.NewDistro, Distro = c });
+                }
+                add(makeDefault);
+                add(label("A new distribution downloads a few hundred MB, is brought up to date and gets btrfs-progs, util-linux and kmod " +
+                          "(openSUSE also libfsapfs, for Mac drives). That takes about 5 to 20 minutes. Setup does it as root, so no Linux " +
+                          "user account is needed.", 8.5f, FontStyle.Regular, SystemColors.GrayText));
+            }
+            AddOption(add, "I'll set it up myself (opens the step-by-step guides)", new LinuxChoice { Action = LinuxAction.Manual },
+                      "Guides for openSUSE, Ubuntu, Kali, Debian, Fedora, Arch, CentOS / AlmaLinux and SLES.");
+
+            var guides = new LinkLabel { Text = "Step-by-step guides on GitHub", AutoSize = true, Margin = new Padding(0, 4, 0, 4) };
+            guides.LinkClicked += (s, e) => InstallForm.OpenGuides();
+            add(guides);
+
+            var ok = new Button { Text = "Continue", AutoSize = true, MinimumSize = new Size(96, 28), Margin = new Padding(6, 0, 0, 0) };
+            var skip = new Button { Text = "Skip", AutoSize = true, MinimumSize = new Size(96, 28), Margin = new Padding(6, 0, 0, 0), DialogResult = DialogResult.Cancel };
+            ok.Click += (s, e) =>
+            {
+                KeyValuePair<RadioButton, LinuxChoice> picked = options.FirstOrDefault(x => x.Key.Checked);
+                if (picked.Key == null) return;
+                Choice = picked.Value;
+                Choice.SetDefault = Choice.Action == LinuxAction.NewDistro && makeDefault.Checked;
+                DialogResult = DialogResult.OK;
+            };
+            var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
+            buttons.Controls.Add(skip);
+            buttons.Controls.Add(ok);
+            add(buttons);
+
+            Controls.Add(rows);
+            AcceptButton = ok;
+            CancelButton = skip;
+            if (options.Count > 0) options[0].Key.Checked = true;
+            UpdateDefaultBox();
+        }
+
+        /// <summary>A radio button (kept to one line: they don't wrap) with an optional wrapped note under it.</summary>
+        private void AddOption(Action<Control> add, string text, LinuxChoice choice, string detail = null)
+        {
+            var rb = new RadioButton { Text = text, AutoSize = true, Margin = new Padding(4, 2, 0, detail == null ? 4 : 0) };
+            rb.CheckedChanged += (s, e) => UpdateDefaultBox();
+            options.Add(new KeyValuePair<RadioButton, LinuxChoice>(rb, choice));
+            add(rb);
+            if (detail != null)
+            {
+                add(new Label
+                {
+                    Text = detail,
+                    AutoSize = true,
+                    MaximumSize = new Size(515, 0),
+                    Font = new Font("Segoe UI", 8.5f),
+                    ForeColor = SystemColors.GrayText,
+                    Margin = new Padding(22, 0, 0, 6)
+                });
+            }
+        }
+
+        private void UpdateDefaultBox()
+        {
+            if (makeDefault == null) return;
+            KeyValuePair<RadioButton, LinuxChoice> picked = options.FirstOrDefault(x => x.Key.Checked);
+            makeDefault.Enabled = picked.Key != null && picked.Value.Action == LinuxAction.NewDistro;
         }
     }
 

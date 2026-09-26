@@ -38,6 +38,10 @@ This guide uses **`Ubuntu-24.04`**. For another version, replace the name everyw
 
 ## Step 1: Turn on WSL2 (once per PC)
 
+> **Shortcut:** the installer (`LinuxUsbMounter-<version>-Setup.exe`) can do Steps 1 to 3 for you (it installs **Ubuntu 26.04 LTS**; this guide uses 24.04, whose `libfsapfs-utils` also reads Mac drives).
+> Leave **Check the Linux setup in WSL2** ticked and pick this distro when it asks. Follow the steps below to do
+> it by hand, or for the optional extras.
+
 Skip this step if you already use WSL, but still run `wsl --update`.
 
 1. **Check that virtualization is on.** Press **Ctrl+Shift+Esc** to open Task Manager, click
