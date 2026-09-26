@@ -88,7 +88,8 @@ Run **`LinuxUsbMounter-<version>-Setup.exe`** and click **Yes** when Windows ask
     or **Kali Linux**. Setup installs it, brings it up to date and adds `btrfs-progs`, `util-linux` and
     `kmod` (plus `libfsapfs` on openSUSE, for Mac drives), all as root, so no Linux user account is needed
     (open the distribution from the Start menu later if you want one). Optionally it becomes the default
-    WSL distribution. This downloads a few hundred MB and takes about 5 to 20 minutes;
+    WSL distribution. This downloads a few hundred MB and takes about 5 to 20 minutes. Setup remembers it,
+    so the uninstaller can offer to remove it too;
   - **add just the missing packages** to a distribution you already have (zypper, apt, dnf or pacman);
   - or let you **set it up yourself**: it opens the [step-by-step guides](docs/distros/README.md).
 
@@ -120,12 +121,18 @@ it is about to do and warns first when the program is running or drives are moun
    drive can't be unmounted, it asks before going on (the drive then stays attached to WSL until
    `wsl --shutdown` or a restart). If another copy of the program is still running from a different
    folder, the drives are left to that copy;
-3. removes start at logon (if it starts this copy), the shortcuts, the PATH entry, the Installed apps
+3. if setup installed a WSL Linux distribution for you (the Linux check above), asks under **What to remove**
+   whether to remove only **the Windows app** (the default) or **the Windows app and that distribution**.
+   Ticking the distribution deletes it and every file inside it with `wsl --unregister` (including files you
+   saved there and the filesystem drivers built in it); this can't be undone. It is removed only after the
+   drives are unmounted, and kept if drives stay mounted or another copy of the program is running;
+4. removes start at logon (if it starts this copy), the shortcuts, the PATH entry, the Installed apps
    entry and the program's files. Files you put in the install folder yourself are kept, and then so
    is the folder;
-4. deletes your settings and logs (`%LOCALAPPDATA%\BtrfsUsbMounter`) only if you tick that box.
+5. deletes your settings and logs (`%LOCALAPPDATA%\BtrfsUsbMounter`) only if you tick that box.
 
-Filesystem drivers built inside your WSL distros (`/var/lib/wsl-modules`) are not touched.
+WSL itself, and distributions you installed yourself, are never removed; neither are the filesystem drivers
+built inside a distribution you keep (`/var/lib/wsl-modules`).
 
 ### Portable (copy the files, no installation)
 

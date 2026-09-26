@@ -85,6 +85,13 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   zypper) util-linux kmod, optional libfsapfs (openSUSE) / libfsapfs-utils (Ubuntu 24.04 only; not 26.04). Runs as root,
   no Linux user / OOBE; optional `wsl --set-default`. Scripts go through `wsl -d X -u root --exec sh -c "<script>"`:
   keep them free of double quotes. Progress-bar lines are filtered from the log. Guides link: GitHub docs/distros
+- Distros setup installed (2.2.0): recorded right after `wsl --install` in the Uninstall key, value `LumSetupDistros`
+  (REG_MULTI_SZ, `<user SID>\t<name>`: distros are per Windows user, the key per machine; kept across updates because
+  Register never deletes it). UninstallForm lists those of the current user that `wsl --list` still shows under "What
+  to remove": the Windows app (always, disabled box) and each distro (unticked by default, "can't be undone" note; the
+  confirmation names it). Uninstaller.Run removes ticked distros with `wsl --unregister` after the unmount step, and
+  keeps them if drives are still mounted or another copy runs elsewhere. WSL itself and user-installed distros are
+  never removed
 
 ## Filesystems
 - User docs (README, docs/distros, --help, menu and dialog texts) do NOT mention ReiserFS or Reiser4 (user decision
@@ -234,7 +241,10 @@ Linux check (2.1.0, non-elevated is enough for WSL): Check on the dev PC (Tumble
 Kali test distro (btrfs-progs removed, detected, only it reinstalled); fresh `Ubuntu-26.04` through InstallDistro +
 InstallPackages(fresh): registered with --no-launch in 15 s, 93 packages upgraded + btrfs-progs, default user root,
 52 s total, then unregistered. Dialog rendered in the no-WSL / no-distro / fixable+WSL1 states. NOT run: installing WSL
-itself (restart path), `wsl --update` path, Tumbleweed / Kali fresh installs, dnf / pacman scripts
+itself (restart path), `wsl --update` path, Tumbleweed / Kali fresh installs, dnf / pacman scripts.
+Distro removal (2.2.0): UninstallForm with recorded [kali-linux, Gone-Distro] shows one unticked box (kali only);
+InstallDistro(Ubuntu-26.04) then RemoveDistro: gone from `wsl --list`. SetupDistros() reads the real key (0 entries).
+NOT run: AddSetupDistro (HKLM write needs elevation), a full elevated uninstall that removes a distro
 
 ## Verification done before handover
 Compiles against the 4.8 reference assemblies; 32 core tests passed under Mono (superblock

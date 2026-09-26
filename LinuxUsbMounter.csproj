@@ -19,7 +19,7 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningLevel>4</WarningLevel>
 
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Product>Linux USB Mounter</Product>
     <Description>Mount Linux and Mac formatted USB drives on Windows through WSL2</Description>
     <Company>Jay Weiner</Company>

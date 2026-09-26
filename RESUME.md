@@ -1,34 +1,34 @@
 # ▶ START HERE — Linux USB Mounter resume
 
-**⭐ LAST COMMIT (2026-09-26): VERSION 2.1.0, SETUP CHECKS WSL2 / LINUX AND CAN SET IT UP.** After copying the files, setup
-checks WSL and the WSL2 distros (btrfs, blkid, modinfo). If none is ready it offers: install WSL (restart, run setup
-again), update WSL, add only the missing packages to an existing distro, install openSUSE Tumbleweed (default) /
-Ubuntu 26.04 / Kali with the packages, or open the guides. Builds clean: `LinuxUsbMounter-2.1.0-Setup.exe` / `-Portable.zip`.
-Tested for real against WSL (no admin needed): check, fix path (Kali), fresh Ubuntu 26.04 install (then unregistered).
-The user's real 2.0.0 install in `C:\Apps\Linux_USB` checked out (registry, files, Start menu, logon task).
-Committed and pushed. Before it: `5e0028c` (v2 icon files deleted), `a9020bf` (installer + portable zip).
+**⭐ LAST COMMIT (2026-09-26): VERSION 2.2.0, UNINSTALL CAN ALSO REMOVE THE WSL DISTRO SETUP INSTALLED.** Setup records
+each distro it installs (`LumSetupDistros`, per user SID); the uninstall window then shows "What to remove": the Windows
+app (always) and that distro (unticked; deletes it with `wsl --unregister`, after the drives are unmounted). Builds clean:
+`LinuxUsbMounter-2.2.0-Setup.exe` / `-Portable.zip`. Tested: window layout, InstallDistro + RemoveDistro on a throwaway
+Ubuntu 26.04. Not elevated-tested (recording needs HKLM write).
+Committed and pushed. Before it: `c676eba` 2.1.0 (setup checks WSL2 / Linux and can set it up).
 
-_**Next: ① (done: committed, pushed)** **② run the 2.1.0 setup over the 2.0.0 install** (Update; Linux check says
-Tumbleweed is ready) **③ uninstall test** with a drive mounted **④ the earlier run list**._
+_**Next: ① (done: committed, pushed)** **② run the 2.2.0 setup over the 2.0.0 install** (Update; Linux check says
+Tumbleweed is ready) **③ uninstall test** with a drive mounted (and, on a test PC, with a setup-installed distro) **④ the
+earlier run list**._
 
 > ### 1. GOAL
 > **Enduring:** a standalone Windows tool that mounts Linux/Mac/BSD-formatted USB drives through WSL2 (`wsl --mount`): btrfs,
 > ext2/3/4, XFS read/write with the stock kernel; JFS, HFS+, ZFS, APFS, UFS through modules built by
 > `tools/build-wsl-modules.sh`; APFS read-only through fsapfsmount otherwise; ReiserFS on kernels before 6.13; Reiser4
 > detect-only. Safe eject. Never blocks the UI thread; every wsl.exe call has a timeout and honours cancellation.
-> **Now:** setup makes sure WSL2 has a working Linux (user request 2026-09-26), version 2.1.0.
+> **Now:** the uninstaller offers to remove the WSL distro setup installed (user request 2026-09-26), version 2.2.0.
 
 > ### 2. STATE
-> **Committed and pushed** on `main` (previous commit `5e0028c`). Clean `dotnet build -c Release`: 0 warnings, 0 errors.
+> **Committed and pushed** on `main` (previous commit `c676eba`). Clean `dotnet build -c Release`: 0 warnings, 0 errors.
 > **User's machine:** 2.0.0 installed by setup in `C:\Apps\Linux_USB` (Start menu shortcut, logon task there). WSL 2.7.14,
 > distros openSUSE-Tumbleweed (default, ready) and kali-linux (test, ready). Tumbleweed's util-linux was upgraded
 > 2.42.2 → 2.42.3 by a test of the first package-step version (normal repo update); since then only missing packages.
 > **Built modules:** Tumbleweed and Kali both have the final `ufs.ko` (`wsl_handoff=1`) in `/var/lib/wsl-modules/6.18.33.2-...`.
 
 > ### 3. FILES THIS TURN
-> `installer/Setup.cs` (WslRunner, LinuxSetup, LinuxSetupDialog, InstallForm Linux step, uninstall message) ·
-> `installer/setup.manifest`, `app.manifest`, `LinuxUsbMounter.csproj` (2.1.0) · `README.md` · `docs/distros/README.md`,
-> `opensuse-tumbleweed.md`, `ubuntu.md`, `kali.md` (setup tip) · `CLAUDE.md` · `STATUS.md` · this file.
+> `installer/Setup.cs` (Installation.AddSetupDistro / SetupDistros, LinuxSetup.InstalledNames / RemoveDistro, Uninstaller
+> step 2b, UninstallForm "What to remove") · `installer/setup.manifest`, `app.manifest`, `LinuxUsbMounter.csproj` (2.2.0) ·
+> `README.md` · `CLAUDE.md` · `STATUS.md` · this file. (2.1.0 before it: the Linux check; see STATUS.md.)
 
 > ### 4. WHAT CHANGED
 > · **Check:** `wsl --version` / `--status`, `--list --verbose`, then per WSL2 distro (default first) as root: tools,

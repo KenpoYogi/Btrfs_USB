@@ -381,6 +381,44 @@ namespace LinuxUsbMounter.Setup
         {
             using (RegistryKey hklm = Hklm()) hklm.DeleteSubKeyTree(Product.UninstallKey, false);
         }
+
+        // WSL distros setup installed, as "<user SID>\t<name>": distros belong to a Windows user, this key to the machine
+        private const string SetupDistrosValue = "LumSetupDistros";
+
+        private static string UserSid()
+        {
+            using (System.Security.Principal.WindowsIdentity id = System.Security.Principal.WindowsIdentity.GetCurrent())
+                return id.User != null ? id.User.Value : string.Empty;
+        }
+
+        /// <summary>Remembers that setup installed <paramref name="distro"/> for the current user (the uninstaller offers to remove it).</summary>
+        public static void AddSetupDistro(string distro)
+        {
+            using (RegistryKey hklm = Hklm())
+            using (RegistryKey k = hklm.OpenSubKey(Product.UninstallKey, true))
+            {
+                if (k == null) return;
+                var entries = new List<string>(k.GetValue(SetupDistrosValue) as string[] ?? new string[0]);
+                string entry = UserSid() + "\t" + distro;
+                if (!entries.Contains(entry, StringComparer.OrdinalIgnoreCase)) entries.Add(entry);
+                k.SetValue(SetupDistrosValue, entries.ToArray(), RegistryValueKind.MultiString);
+            }
+        }
+
+        /// <summary>Distros setup installed for the current user (they may have been removed since).</summary>
+        public static List<string> SetupDistros()
+        {
+            using (RegistryKey hklm = Hklm())
+            using (RegistryKey k = hklm.OpenSubKey(Product.UninstallKey))
+            {
+                if (k == null) return new List<string>();
+                string prefix = UserSid() + "\t";
+                string[] entries = k.GetValue(SetupDistrosValue) as string[] ?? new string[0];
+                return entries.Where(e => e.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                              .Select(e => e.Substring(prefix.Length))
+                              .ToList();
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -868,8 +906,11 @@ namespace LinuxUsbMounter.Setup
     // ---------------------------------------------------------------------------------------
     internal static class Uninstaller
     {
-        /// <summary>False when the user stopped it because drives could not be unmounted.</summary>
-        public static bool Run(string dir, bool removeData, Func<string, bool> confirm, Action<string> log)
+        /// <summary>
+        /// False when the user stopped it because drives could not be unmounted. <paramref name="removeDistros"/>: WSL
+        /// distros setup installed that the user chose to delete as well (after the drives are unmounted).
+        /// </summary>
+        public static bool Run(string dir, bool removeData, IList<string> removeDistros, Func<string, bool> confirm, Action<string> log)
         {
             string exe = Path.Combine(dir, Product.ExeName);
             log("Uninstalling " + Product.Name + " from " + dir);
@@ -911,6 +952,32 @@ namespace LinuxUsbMounter.Setup
                 }
             }
 
+            // 2b. the Linux distros setup installed, if the user ticked them. Never with drives still mounted (they are
+            //     mounted through the distro) or while another copy of the program may be using it
+            if (removeDistros != null && removeDistros.Count > 0)
+            {
+                if (mounted.Count > 0 || others.Count > 0)
+                {
+                    log("Keeping " + string.Join(", ", removeDistros) + ": " +
+                        (mounted.Count > 0 ? "drives are still mounted through it." : Product.Name + " is also running from " + string.Join(", ", others) + ".") +
+                        " Remove it later with \"wsl --unregister <name>\".");
+                }
+                else
+                {
+                    foreach (string distro in removeDistros)
+                    {
+                        try
+                        {
+                            LinuxSetup.RemoveDistro(distro, log);
+                        }
+                        catch (Exception ex)
+                        {
+                            log("  " + ex.Message);
+                        }
+                    }
+                }
+            }
+
             // 3. start at logon
             string cmd = LogonTask.Command();
             if (cmd != null && Paths.IsUnder(cmd, dir)) LogonTask.Delete(log);
@@ -948,8 +1015,8 @@ namespace LinuxUsbMounter.Setup
                     log("Could not delete " + Product.DataDir + ": " + ex.Message);
                 }
             }
-            log("Done. WSL and its Linux distributions were left in place, including any setup installed and the filesystem drivers " +
-                "built inside them (/var/lib/wsl-modules). \"wsl --unregister <name>\" removes a distribution and everything in it.");
+            log("Done. WSL itself, and any Linux distribution not removed above, were left in place (with the filesystem drivers " +
+                "built inside them, /var/lib/wsl-modules). \"wsl --unregister <name>\" removes a distribution and everything in it.");
             return true;
         }
 
@@ -1318,6 +1385,24 @@ namespace LinuxUsbMounter.Setup
                 throw new InvalidOperationException("The packages could not be installed (exit " + r.ExitCode + "). " + distro + " is still missing " +
                                                     string.Join(", ", d.Missing) + ". See the guides for doing it by hand.");
             log(distro + " is ready: btrfs, blkid and modinfo found.");
+        }
+
+        /// <summary>Names of the installed distros (WSL1 and 2); empty when WSL is missing. Does not boot the VM.</summary>
+        public static List<string> InstalledNames()
+        {
+            if (!File.Exists(WslRunner.Exe)) return new List<string>();
+            try { return List().Select(d => d.Name).ToList(); }
+            catch { return new List<string>(); }
+        }
+
+        /// <summary>wsl --unregister: deletes the distro and every file inside it.</summary>
+        public static void RemoveDistro(string distro, Action<string> log)
+        {
+            log("Removing the Linux distribution " + distro + " (wsl --unregister)...");
+            WslResult r = WslRunner.Run("--unregister " + distro, 600, log);
+            if (r.ExitCode != 0)
+                throw new InvalidOperationException("wsl --unregister " + distro + " failed (exit " + r.ExitCode + "): " + WslRunner.LastLines(r.Output, 3));
+            log("  " + distro + " and everything in it was removed.");
         }
 
         public static void SetDefault(string distro, Action<string> log)
@@ -1742,6 +1827,7 @@ namespace LinuxUsbMounter.Setup
                             break;
                         case LinuxAction.NewDistro:
                             LinuxSetup.InstallDistro(choice.Distro, Log);
+                            Installation.AddSetupDistro(choice.Distro.Name);   // the uninstaller offers to remove it
                             LinuxSetup.InstallPackages(choice.Distro.Name, true, Log);
                             if (choice.SetDefault) LinuxSetup.SetDefault(choice.Distro.Name, Log);
                             Log("To use " + choice.Distro.Name + " yourself, open it from the Start menu (it may ask you to create a Linux user).");
@@ -1928,12 +2014,16 @@ namespace LinuxUsbMounter.Setup
 
         private readonly string dir;
         private readonly CheckBox removeData;
+        private readonly List<CheckBox> distroBoxes = new List<CheckBox>();
         private readonly Button uninstallButton, cancelButton;
         private readonly bool running;
         private readonly List<string> mounted;
         private bool finished;
 
-        public UninstallForm(string dir) : base("Uninstall " + Product.Name)
+        public UninstallForm(string dir) : this(dir, Installation.SetupDistros()) { }
+
+        /// <param name="setupDistros">WSL distros setup installed for this user; those still present get a checkbox.</param>
+        internal UninstallForm(string dir, List<string> setupDistros) : base("Uninstall " + Product.Name)
         {
             this.dir = dir;
             running = AppProcesses.AnyRunning(dir);
@@ -1956,6 +2046,31 @@ namespace LinuxUsbMounter.Setup
                                string.Join(", ", others) + " and keeps managing them."));
             if (!running && drives.Count == 0)
                 AddRow(Caption(Product.Name + " is not running and no drives are mounted."));
+
+            // what to remove: the Windows app always; the Linux distros setup installed only if ticked (off by default)
+            List<string> present = setupDistros.Count == 0 ? new List<string>() : LinuxSetup.InstalledNames();
+            List<string> offered = setupDistros.Where(d => present.Contains(d, StringComparer.OrdinalIgnoreCase)).ToList();
+            if (offered.Count > 0)
+            {
+                AddRow(Caption("What to remove:", 9f, FontStyle.Bold));
+                AddRow(new CheckBox { Text = "The Windows app, " + Product.Name, Checked = true, Enabled = false, AutoSize = true, Margin = new Padding(0, 0, 0, 2) });
+                foreach (string d in offered)
+                {
+                    var box = new CheckBox { Text = "The WSL Linux distribution " + d + ", which setup installed", Tag = d, AutoSize = true, Margin = new Padding(0, 2, 0, 0) };
+                    distroBoxes.Add(box);
+                    AddRow(box);
+                    AddRow(new Label
+                    {
+                        Text = "Deletes " + d + " and every file inside it (wsl --unregister), including files you saved there and the " +
+                               "filesystem drivers built in it. This can't be undone. Leave it unticked to keep using it.",
+                        AutoSize = true,
+                        MaximumSize = new Size(545, 0),
+                        Font = new Font("Segoe UI", 8.5f),
+                        ForeColor = SystemColors.GrayText,
+                        Margin = new Padding(18, 0, 0, 4)
+                    });
+                }
+            }
 
             removeData = new CheckBox
             {
@@ -1982,25 +2097,25 @@ namespace LinuxUsbMounter.Setup
                 Close();
                 return;
             }
-            if ((running || mounted.Count > 0) &&
+            List<string> removeDistros = distroBoxes.Where(b => b.Checked).Select(b => (string)b.Tag).ToList();
+            if ((running || mounted.Count > 0 || removeDistros.Count > 0) &&
                 MessageBox.Show(this, (running ? Product.Name + " will be closed.\r\n" : string.Empty) +
                                       (mounted.Count > 0 ? mounted.Count + " mounted drive(s) will be flushed and unmounted: " + string.Join(", ", mounted) + ".\r\n" : string.Empty) +
+                                      (removeDistros.Count > 0 ? "The WSL Linux distribution " + string.Join(", ", removeDistros) +
+                                                                 " will be DELETED with every file inside it. This can't be undone.\r\n" : string.Empty) +
                                       "\r\nContinue?", Text, MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)
                 return;
 
-            uninstallButton.Enabled = false;
-            cancelButton.Enabled = false;
-            removeData.Enabled = false;
+            var inputs = new List<Control>(distroBoxes) { uninstallButton, cancelButton, removeData };
+            foreach (Control c in inputs) c.Enabled = false;
             bool completed = false;
             bool remove = removeData.Checked;
-            Exception error = await RunBusy(() => completed = Uninstaller.Run(dir, remove, Ask, Log));
+            Exception error = await RunBusy(() => completed = Uninstaller.Run(dir, remove, removeDistros, Ask, Log));
             if (error != null)
             {
                 Log("FAILED: " + error.Message);
                 MessageBox.Show(this, "Uninstall failed: " + error.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                uninstallButton.Enabled = true;
-                cancelButton.Enabled = true;
-                removeData.Enabled = true;
+                foreach (Control c in inputs) c.Enabled = true;
                 return;
             }
             finished = true;
