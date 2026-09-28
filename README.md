@@ -7,7 +7,8 @@ WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline che
 - `LinuxUsbMounter.exe` (plus its `.exe.config`) and a small console front end `LinuxUsbMounter.com`;
   .NET 4.8 ships with Windows 11
 - Two ways to install (see [Install](#install)): the installer `LinuxUsbMounter-<version>-Setup.exe` (with an
-  uninstaller), or the portable `LinuxUsbMounter-<version>-Portable.zip` (extract anywhere, nothing to install)
+  uninstaller), or the portable `LinuxUsbMounter-<version>-Portable.zip` (extract anywhere, nothing to install;
+  you then set up WSL2 and the Linux distro yourself)
 - Uses the same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version, so
   settings and mount state carry over
 
@@ -64,6 +65,7 @@ settings (`%LOCALAPPDATA%\BtrfsUsbMounter`):
 | Goes to | `C:\Program Files\Linux_USB`, or a folder you choose | any folder you extract it to (a USB stick works too) |
 | Start menu / desktop shortcut, PATH | yes (you choose) | no; make your own shortcut if you want one |
 | Listed in Installed apps, with an uninstaller | yes | no; to remove it, delete the folder |
+| Checks WSL2 and sets up a Linux distro for you | yes (the **Linux check**, below) | **no: you install and set up WSL2 and the distro yourself** ([guides](docs/distros/README.md)) |
 | Updating | run the newer setup | exit the program, replace the files |
 
 Both are in `bin\Release\` after a build. The zip holds exactly the files the installer puts in place.
@@ -136,6 +138,12 @@ built inside a distribution you keep (`/var/lib/wsl-modules`).
 
 ### Portable (copy the files, no installation)
 
+> **You set up Linux yourself.** The portable version has no setup, so nothing checks or installs WSL2
+> or a Linux distribution for you (that is the installer's **Linux check**). Before you mount a drive,
+> install WSL2 and a WSL2 distribution by hand and add the packages the program needs (`btrfs-progs`,
+> `util-linux`, `kmod`); the [step-by-step guides](docs/distros/README.md) show how for each distribution.
+> Without them the program can list your drives but not mount them.
+
 Extract `LinuxUsbMounter-<version>-Portable.zip` to a folder of your choice, e.g. `C:\Tools\LinuxUsbMounter\`
 (or copy everything in `bin\Release\net48\` there), and start `LinuxUsbMounter.exe`. Nothing is written
 outside that folder except the settings and log in `%LOCALAPPDATA%\BtrfsUsbMounter`, and the logon task if
@@ -152,25 +160,6 @@ Keep the files together in the same layout: `LinuxUsbMounter.exe`, `LinuxUsbMoun
 - **Moved the folder?** Untick and re-tick **Start in tray at logon** from the new location.
 - **Switching to the installer later** is fine: setup offers to close the portable copy if it is running;
   delete the portable folder afterwards.
-
-### Migrating from the PowerShell version
-
-1. Exit the PowerShell tool (tray icon > Exit).
-2. Install with the setup, or use the portable zip (above), and start the program. On first start it
-   reads your existing settings and mounted drives, and re-points the "start at logon" task from the
-   PowerShell script to the new program.
-3. Delete the old Desktop shortcut and `Mount-BtrfsUsb.cmd` (or keep the old folder as a fallback;
-   the two versions can never run at the same time).
-
-### Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe
-
-The program used to be called Btrfs USB Mounter (`BtrfsUsbMounter.exe` / `.com`), and briefly Xnix USB Mounter
-(`XnixUsbMounter.exe` / `.com`). To upgrade, run the setup (it offers to close the old copy if it is running),
-then delete the old folder; or, by hand, exit the old copy (tray icon > Exit), copy the new files in, delete
-the old `.exe`, `.exe.config` and `.com` files, and start `LinuxUsbMounter.exe`. Nothing else changes: settings, mount state and
-the log stay in `%LOCALAPPDATA%\BtrfsUsbMounter`, the **start at logon** task (still named `BtrfsUsbMounter`
-in Task Scheduler) is re-pointed to the new program on its first start, and an old copy that is still
-running is detected as usual.
 
 ## Supported filesystems
 

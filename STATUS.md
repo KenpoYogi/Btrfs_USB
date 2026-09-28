@@ -8,7 +8,15 @@
 
 ---
 
-## ⭐ (this commit) — **2.2.0: THE UNINSTALLER OFFERS TO REMOVE THE WSL DISTRO SETUP INSTALLED.** _2026-09-26. Evidence: user request ("If the installer did the WSL linux install, during uninstall ask the user (maybe check boxes) if they want to uninstall the Windows App Only or both the Windows App and the WSL Linux instance. Increment the version to 2.2.0"). `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.2.0-Setup.exe / -Portable.zip. Non-elevated tests by reflection: UninstallForm with recorded distros [kali-linux, Gone-Distro] rendered "What to remove" with the Windows app (ticked, disabled) and one unticked box for kali-linux only; InstallDistro(Ubuntu-26.04) then the new RemoveDistro: listed, then gone from `wsl --list` (Tumbleweed and Kali untouched); SetupDistros() on the real 2.0.0 key: 0 entries. NOT run: AddSetupDistro (HKLM write needs elevation), a full elevated uninstall that removes a distro._
+## ⭐ (this commit) — **README: MIGRATION / UPGRADE SECTIONS REMOVED; PORTABLE = SET UP LINUX YOURSELF.** _2026-09-28. Evidence: user request ("remove the \"Migrating from the PowerShell version\" section and the \"Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe\" section from the README"; "make it clear that if the \"Portable\" version is installed, the user must do a manual install and setup of the linux distros in WSL"). Docs only, no build._
+
+- **Removed:** the two README sections (nothing linked to them).
+- **Portable:** intro bullet, a new Install table row (Linux check: installer yes, portable no + guides link) and a note at
+  the top of the Portable section: install WSL2, a distro and btrfs-progs / util-linux / kmod by hand (docs/distros).
+
+---
+
+## ⭐ `0de4a65` — **2.2.0: THE UNINSTALLER OFFERS TO REMOVE THE WSL DISTRO SETUP INSTALLED.** _2026-09-26. Evidence: user request ("If the installer did the WSL linux install, during uninstall ask the user (maybe check boxes) if they want to uninstall the Windows App Only or both the Windows App and the WSL Linux instance. Increment the version to 2.2.0"). `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.2.0-Setup.exe / -Portable.zip. Non-elevated tests by reflection: UninstallForm with recorded distros [kali-linux, Gone-Distro] rendered "What to remove" with the Windows app (ticked, disabled) and one unticked box for kali-linux only; InstallDistro(Ubuntu-26.04) then the new RemoveDistro: listed, then gone from `wsl --list` (Tumbleweed and Kali untouched); SetupDistros() on the real 2.0.0 key: 0 entries. NOT run: AddSetupDistro (HKLM write needs elevation), a full elevated uninstall that removes a distro._
 
 - **Record:** after `wsl --install` succeeds, `Installation.AddSetupDistro` adds `<user SID>\t<name>` to
   `LumSetupDistros` (REG_MULTI_SZ) in the Uninstall key; updates keep it.

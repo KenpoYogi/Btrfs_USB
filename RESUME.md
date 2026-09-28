@@ -6,6 +6,9 @@ app (always) and that distro (unticked; deletes it with `wsl --unregister`, afte
 `LinuxUsbMounter-2.2.0-Setup.exe` / `-Portable.zip`. Tested: window layout, InstallDistro + RemoveDistro on a throwaway
 Ubuntu 26.04. Not elevated-tested (recording needs HKLM write).
 Committed and pushed. Before it: `c676eba` 2.1.0 (setup checks WSL2 / Linux and can set it up).
+**Then (2026-09-28, committed and pushed): README only.** Removed "Migrating from the PowerShell version" and "Upgrading from
+BtrfsUsbMounter.exe or XnixUsbMounter.exe" (user request); the portable version now says clearly (intro, Install table
+row, note at the top of its section) that WSL2 and the distro must be installed and set up by hand (no Linux check).
 
 _**Next: ① (done: committed, pushed)** **② run the 2.2.0 setup over the 2.0.0 install** (Update; Linux check says
 Tumbleweed is ready) **③ uninstall test** with a drive mounted (and, on a test PC, with a setup-installed distro) **④ the
