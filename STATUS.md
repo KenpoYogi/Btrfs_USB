@@ -8,7 +8,15 @@
 
 ---
 
-## ⭐ (this commit) — **README: "WHAT CHANGED COMPARED TO THE POWERSHELL VERSION" REMOVED.** _2026-09-28. Evidence: user request ("Also remove \"What changed compared to the PowerShell version\" section from the README"). Docs only, no build._
+## ⭐ (this commit) — **README: NO MORE "POWERSHELL VERSION" MENTIONS.** _2026-09-28. Evidence: user said "yes please" to removing / rewording the two remaining mentions. Docs only, no build._
+
+- **Intro:** "A compiled port of the PowerShell tool: mount ..." is now "Mount ...".
+- **Removed:** the "same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version" bullet (the Install section
+  names the folder). PowerShell now appears only as the shell (build command, command line).
+
+---
+
+## ⭐ `b3b1aee` — **README: "WHAT CHANGED COMPARED TO THE POWERSHELL VERSION" REMOVED.** _2026-09-28. Evidence: user request ("Also remove \"What changed compared to the PowerShell version\" section from the README"). Docs only, no build._
 
 - **Removed:** the comparison table and the "Behaviour is otherwise identical" paragraph (nothing linked to them).
 

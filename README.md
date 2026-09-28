@@ -1,7 +1,6 @@
 # Linux USB Mounter (C# / .NET Framework 4.8)
 
-A compiled port of the PowerShell tool: mount Linux- and Mac-formatted USB drives on Windows through
-WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline checks for btrfs.
+Mount Linux- and Mac-formatted USB drives on Windows through WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline checks for btrfs.
 
 - .NET Framework 4.8, C# 7.3, WinForms, **no NuGet packages**
 - `LinuxUsbMounter.exe` (plus its `.exe.config`) and a small console front end `LinuxUsbMounter.com`;
@@ -9,8 +8,6 @@ WSL2, with free-space bars, tray icon and auto-mount, plus scrub and offline che
 - Two ways to install (see [Install](#install)): the installer `LinuxUsbMounter-<version>-Setup.exe` (with an
   uninstaller), or the portable `LinuxUsbMounter-<version>-Portable.zip` (extract anywhere, nothing to install;
   you then set up WSL2 and the Linux distro yourself)
-- Uses the same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version, so
-  settings and mount state carry over
 
 ## Setting up WSL2 and a Linux distro
 

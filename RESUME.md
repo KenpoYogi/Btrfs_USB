@@ -9,7 +9,9 @@ Committed and pushed. Before it: `c676eba` 2.1.0 (setup checks WSL2 / Linux and 
 **Then (2026-09-28, committed and pushed): README only.** Removed "Migrating from the PowerShell version" and "Upgrading from
 BtrfsUsbMounter.exe or XnixUsbMounter.exe" (user request); the portable version now says clearly (intro, Install table
 row, note at the top of its section) that WSL2 and the distro must be installed and set up by hand (no Linux check).
-**Then `54ef01f`'s follow-up (committed and pushed): README only.** Also removed "What changed compared to the PowerShell version" (user request).
+**Then `b3b1aee`: README only.** Also removed "What changed compared to the PowerShell version" (user request).
+**Then (committed and pushed): README only.** Intro no longer calls it a port of the PowerShell tool; the "same folder as the
+PowerShell version" bullet is gone (user request). The README now mentions PowerShell only as the shell.
 
 _**Next: ① (done: committed, pushed)** **② run the 2.2.0 setup over the 2.0.0 install** (Update; Linux check says
 Tumbleweed is ready) **③ uninstall test** with a drive mounted (and, on a test PC, with a setup-installed distro) **④ the
