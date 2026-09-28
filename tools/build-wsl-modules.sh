@@ -12,11 +12,11 @@
 # them. Run as root inside the WSL distro: openSUSE or SLES (zypper), or Debian, Kali or Ubuntu (apt).
 # Tested on openSUSE Tumbleweed and Kali.
 #
-#   sh build-wsl-modules.sh [jfs] [reiserfs] [hfsplus] [ufs] [zfs] [apfs]    (no arguments = all)
+#   sh build-wsl-modules.sh [jfs] [hfsplus] [ufs] [zfs] [apfs]    (no arguments = all)
 #
 # Rerun after "wsl --update": a new WSL kernel needs modules built against its own source.
 # Built from:
-#   - in-tree drivers (JFS, HFS+, HFS, UFS, and ReiserFS on kernels before 6.13, which removed it) from
+#   - in-tree drivers (JFS, HFS+, HFS, UFS) from
 #     github.com/microsoft/WSL2-Linux-Kernel at the tag matching uname -r, configured with the
 #     running kernel's own /proc/config.gz. UFS gets write support and a small change (ufs_handoff
 #     below) so that FreeBSD notices when Linux wrote to the filesystem
@@ -34,7 +34,7 @@ DEST=/lib/modules/$KVER/extra
 # Mounter copies them back into DEST (plus depmod) when they are missing.
 STORE=/var/lib/wsl-modules/$KVER
 JOBS=$(nproc)
-WANT=${*:-jfs reiserfs hfsplus ufs zfs apfs}
+WANT=${*:-jfs hfsplus ufs zfs apfs}
 
 log() { printf '\n==== %s\n' "$*"; }
 want() { case " $WANT " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
@@ -253,8 +253,6 @@ if [ ! -f vmlinux.symvers ] || ! cmp -s /proc/config.gz .running-config.gz || [ 
     cp /proc/config.gz .running-config.gz
     # drivers that exist in this tree but are off in the WSL build; everything they select is built in
     scripts/config --module JFS_FS --enable JFS_POSIX_ACL --enable JFS_SECURITY \
-                   --module REISERFS_FS --enable REISERFS_FS_XATTR --enable REISERFS_FS_POSIX_ACL \
-                   --enable REISERFS_FS_SECURITY \
                    --module HFSPLUS_FS --module HFS_FS \
                    --module UFS_FS --enable UFS_FS_WRITE \
                    --disable LOCALVERSION_AUTO
@@ -301,13 +299,8 @@ if [ -n "$ref" ] && [ -f "$ref" ]; then
 fi
 
 # ---- in-tree filesystem drivers ---------------------------------------------------------------
-for fs in jfs reiserfs hfsplus; do
+for fs in jfs hfsplus; do
     want "$fs" || continue
-    if [ ! -d "fs/$fs" ]; then
-        # ReiserFS was removed from mainline Linux in 6.13, so newer WSL kernels have no source for it
-        log "Skipping $fs: this kernel tree ($BASE) has no fs/$fs (ReiserFS was removed in Linux 6.13)"
-        continue
-    fi
     dirs="fs/$fs"
     [ "$fs" = hfsplus ] && dirs="fs/hfsplus fs/hfs"
     extra=""
@@ -417,5 +410,5 @@ status=0
 for m in $(ls "$DEST" | sed 's/\.ko$//'); do
     if modprobe "$m"; then echo "  $m: loaded"; else echo "  $m: FAILED"; status=1; fi
 done
-grep -wE 'jfs|reiserfs|hfsplus|hfs|ufs|zfs|apfs' /proc/filesystems || true
+grep -wE 'jfs|hfsplus|hfs|ufs|zfs|apfs' /proc/filesystems || true
 exit $status

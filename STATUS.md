@@ -8,7 +8,16 @@
 
 ---
 
-## ⭐ (this commit) — **README: NO MORE "POWERSHELL VERSION" MENTIONS.** _2026-09-28. Evidence: user said "yes please" to removing / rewording the two remaining mentions. Docs only, no build._
+## ⭐ (this commit) — **2.2.1: REISERFS AND REISER4 REMOVED FROM THE CODE.** _2026-09-28. Evidence: user request ("ReiserFS and Reiser4 are still mentioned in the code. Can you remove these references since they are no longer supported? Increment release to 2.2.1."). `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.2.1-Setup.exe / -Portable.zip. Reflection on the built exe: FsKind = Btrfs,Ext2,Ext3,Ext4,Xfs,Jfs,Zfs,HfsPlus,Apfs,Ufs; a buffer with ReIsEr2Fs at 64 KiB + 52 gives 0 signatures; assembly version 2.2.1.0. `sh -n` on the build script OK. NOT run: the script in WSL (the removed lines were no-ops on 6.18: no fs/reiserfs, no REISERFS_FS symbol)._
+
+- **FileSystems.cs:** FsKind.ReiserFs / Reiser4, their names, the two probes, the NoDriverHint texts, the Buildable and
+  KernelKinds entries. A ReiserFS partition now shows as an unrecognised filesystem.
+- **build-wsl-modules.sh:** the reiserfs argument and default, the REISERFS_FS config options, the pre-6.13 skip branch.
+- **Version 2.2.1:** csproj, app.manifest, installer/setup.manifest. CLAUDE.md: the "probe stays in the code" rule replaced.
+
+---
+
+## ⭐ `941a29d` — **README: NO MORE "POWERSHELL VERSION" MENTIONS.** _2026-09-28. Evidence: user said "yes please" to removing / rewording the two remaining mentions. Docs only, no build._
 
 - **Intro:** "A compiled port of the PowerShell tool: mount ..." is now "Mount ...".
 - **Removed:** the "same `%LOCALAPPDATA%\BtrfsUsbMounter` folder as the PowerShell version" bullet (the Install section

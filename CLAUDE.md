@@ -2,9 +2,9 @@
 
 Standalone Windows desktop tool (NOT a Cimatron plugin; no Cimatron/ACIS references).
 Mounts Linux/Mac-formatted USB drives through WSL2 (`wsl --mount --type <fs>`): btrfs, ext2/3/4 and
-XFS read/write with the stock kernel; JFS, ReiserFS (kernels before 6.13), HFS+, ZFS, APFS (rw experimental) and
+XFS read/write with the stock kernel; JFS, HFS+, ZFS, APFS (rw experimental) and
 UFS1/UFS2 (ro, rw experimental) with modules built by tools/build-wsl-modules.sh; APFS read-only via fsapfsmount
-(FUSE) otherwise; Reiser4 detect-only. It started as a btrfs tool because the
+(FUSE) otherwise. It started as a btrfs tool because the
 WinBtrfs driver is blocked by the Windows "Cross Certificates for Code Integrity Exceptions"
 policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
 
@@ -94,11 +94,12 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   never removed
 
 ## Filesystems
-- User docs (README, docs/distros, --help, menu and dialog texts) do NOT mention ReiserFS or Reiser4 (user decision
-  2026-09-25: they cannot be mounted on current WSL kernels). The probe, its "can't mount" notes and the build script's
-  pre-6.13 reiserfs path stay in the code; don't add them back to the docs
+- ReiserFS and Reiser4 are gone from docs AND code (2.2.1, user request 2026-09-28; docs dropped them 2026-09-25):
+  they cannot be mounted on current WSL kernels (ReiserFS left Linux in 6.13, Reiser4 was never mainline). No FsKind,
+  probe, "can't mount" hint or build-script path; such a partition now shows as an unrecognised filesystem. Don't add
+  them back
 - `src/Core/FileSystems.cs`: `FsProbe` parses one cached 272 KiB read per partition (priority order,
-  btrfs crc32c checked, libblkid-style sanity checks for ReiserFS and ZFS); `FsSupport` asks the
+  btrfs crc32c checked, libblkid-style sanity checks for ZFS); `FsSupport` asks the
   distro at runtime which kinds the kernel has (`/proc/filesystems`, `modinfo`) and if fsapfsmount/zpool exist
 - `MountEntry.FsType` missing = btrfs (older and PowerShell-written state.json)
 - Scrub, drive info, offline check are btrfs-only; the Mount options box is btrfs-only (UFS gets its own
@@ -154,8 +155,7 @@ policy (event 3077, policy 8f9cb695-5d48-48d6-a329-7202b44607e3).
   olddefconfig. GCC_PLUGINS=y in Microsoft's build but off here (no plugin headers): harmless, no
   plugin is enabled and it only adds a rebuild trigger (compiler-version.h)
 - Current WSL kernel (2026-09-24, after `wsl --update`): 6.18.33.2-microsoft-standard-WSL2, built
-  with GCC 13. ReiserFS was removed in Linux 6.13: the script skips it (no fs/reiserfs), so on 6.18
-  ReiserFS is detect-only
+  with GCC 13
 - Verified on 6.18.33.2 (2026-09-24): build with pinned probes, 608/608 btrfs.ko CRCs match; jfs,
   hfs, hfsplus, spl, zfs (2.4.4) and apfs load, no "disagrees about version" in dmesg. Loop-device tests
   (all pass): btrfs/ext4/xfs rw + sync -f; JFS rw, data survives remount, fsck.jfs clean; APFS kernel

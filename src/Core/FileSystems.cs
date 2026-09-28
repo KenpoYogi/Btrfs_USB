@@ -28,8 +28,6 @@ namespace LinuxUsbMounter.Core
         Ext4,
         Xfs,
         Jfs,
-        ReiserFs,
-        Reiser4,
         Zfs,
         HfsPlus,
         Apfs,
@@ -61,8 +59,6 @@ namespace LinuxUsbMounter.Core
                 case FsKind.Ext4: return "ext4";
                 case FsKind.Xfs: return "xfs";
                 case FsKind.Jfs: return "jfs";
-                case FsKind.ReiserFs: return "reiserfs";
-                case FsKind.Reiser4: return "reiser4";
                 case FsKind.Zfs: return "zfs";
                 case FsKind.HfsPlus: return "hfsplus";
                 case FsKind.Apfs: return "apfs";
@@ -77,8 +73,6 @@ namespace LinuxUsbMounter.Core
             {
                 case FsKind.Xfs: return "XFS";
                 case FsKind.Jfs: return "JFS";
-                case FsKind.ReiserFs: return "ReiserFS";
-                case FsKind.Reiser4: return "Reiser4";
                 case FsKind.Zfs: return "ZFS";
                 case FsKind.HfsPlus: return "HFS+";
                 case FsKind.Apfs: return "APFS";
@@ -115,24 +109,13 @@ namespace LinuxUsbMounter.Core
         /// <summary>Kinds whose driver tools/build-wsl-modules.sh can compile for the running WSL kernel.</summary>
         public static bool Buildable(FsKind kind)
         {
-            return kind == FsKind.Jfs || kind == FsKind.ReiserFs || kind == FsKind.HfsPlus || kind == FsKind.Zfs || kind == FsKind.Apfs ||
+            return kind == FsKind.Jfs || kind == FsKind.HfsPlus || kind == FsKind.Zfs || kind == FsKind.Apfs ||
                    kind == FsKind.Ufs;
         }
 
         /// <summary>Advice when the running WSL kernel has no driver for a kernel-mounted kind.</summary>
         public static string NoDriverHint(FsKind kind)
         {
-            if (kind == FsKind.Reiser4)
-            {
-                return "Reiser4 was never part of mainline Linux, and its out-of-tree patches stop at Linux 5.16, so there is " +
-                       "no driver for the WSL kernel (6.x).";
-            }
-            if (kind == FsKind.ReiserFs)
-            {
-                return "No ReiserFS driver is installed for the running WSL kernel. ReiserFS was removed from Linux 6.13, so " +
-                       "Tools > Build filesystem drivers can only build it for WSL kernels older than 6.13 (see uname -r); " +
-                       "on newer kernels it skips ReiserFS. Copy the data off on a Linux system with an older kernel.";
-            }
             if (Buildable(kind))
             {
                 return "No " + DisplayName(kind) + " driver is installed for the running WSL kernel. Use Tools > Build filesystem " +
@@ -154,7 +137,7 @@ namespace LinuxUsbMounter.Core
         /// <summary>Negative when the superblock does not record free space.</summary>
         public double FreeBytes { get; set; }
         public int NumDevices { get; set; }
-        /// <summary>Version detail for the log, e.g. "ReiserFS 3.6" or "HFSX".</summary>
+        /// <summary>Version detail for the log, e.g. "JFS v1" or "HFSX".</summary>
         public string Version { get; set; }
         /// <summary>Only read access is possible (APFS via FUSE, journaled HFS+).</summary>
         public bool ReadOnly { get; set; }
@@ -201,8 +184,6 @@ namespace LinuxUsbMounter.Core
             Add(found, Xfs(b));
             Add(found, Ext(b));
             Add(found, Jfs(b));
-            Add(found, ReiserFs(b));
-            Add(found, Reiser4(b));
             Add(found, HfsPlus(b));
             Add(found, Apfs(b));
             Add(found, Zfs(b));
@@ -401,46 +382,6 @@ namespace LinuxUsbMounter.Core
                 Uuid = Uuid(b, o + 136),
                 TotalBytes = size > 0 ? (double)size * pbsize : 0,
                 Version = "v" + Le32(b, o + 4).ToString(CultureInfo.InvariantCulture)
-            };
-        }
-
-        // ---- ReiserFS 3.x: superblock at 64 KiB (3.5 layouts also at 8 KiB) -----------------------
-        private static FsInfo ReiserFs(byte[] b)
-        {
-            foreach (int o in new[] { 0x10000, 0x2000 })
-            {
-                if (!Has(b, o, 116)) continue;
-                string version = Ascii(b, o + 52, "ReIsEr2Fs") ? "3.6" : Ascii(b, o + 52, "ReIsEr3Fs") ? "3.6 with journal relocation"
-                               : Ascii(b, o + 52, "ReIsErFs") ? "3.5" : null;
-                if (version == null) continue;
-                double blocks = Le32(b, o), free = Le32(b, o + 4);
-                int blockSize = Le16(b, o + 44);
-                // as libblkid: a sane block size, and not a superblock copy inside the journal
-                if (blockSize >> 9 == 0 || (o / 1024) / (blockSize >> 9) > Le32(b, o + 12) / 2) continue;
-                bool v2 = version != "3.5";   // the 3.5 superblock has no UUID or label
-                return new FsInfo
-                {
-                    Kind = FsKind.ReiserFs,
-                    Label = v2 ? Text(b, o + 100, 16) : string.Empty,
-                    Uuid = v2 ? Uuid(b, o + 84) : string.Empty,
-                    TotalBytes = blocks * blockSize,
-                    FreeBytes = free <= blocks ? free * (double)blockSize : -1,
-                    Version = "ReiserFS " + version
-                };
-            }
-            return null;
-        }
-
-        // ---- Reiser4: master superblock at 64 KiB ------------------------------------------------
-        private static FsInfo Reiser4(byte[] b)
-        {
-            const int o = 0x10000;
-            if (!Ascii(b, o, "ReIsEr4") || !Has(b, o, 52)) return null;
-            return new FsInfo
-            {
-                Kind = FsKind.Reiser4,
-                Label = Text(b, o + 36, 16),
-                Uuid = Uuid(b, o + 20)
             };
         }
 
@@ -737,8 +678,8 @@ namespace LinuxUsbMounter.Core
         /// <summary>Filesystems a kernel driver can provide (built in, a shipped module, or one built locally).</summary>
         private static readonly FsKind[] KernelKinds =
         {
-            FsKind.Btrfs, FsKind.Ext2, FsKind.Ext3, FsKind.Ext4, FsKind.Xfs, FsKind.Jfs, FsKind.ReiserFs, FsKind.Reiser4,
-            FsKind.HfsPlus, FsKind.Apfs, FsKind.Zfs, FsKind.Ufs
+            FsKind.Btrfs, FsKind.Ext2, FsKind.Ext3, FsKind.Ext4, FsKind.Xfs, FsKind.Jfs, FsKind.HfsPlus,
+            FsKind.Apfs, FsKind.Zfs, FsKind.Ufs
         };
 
         private sealed class DistroSupport

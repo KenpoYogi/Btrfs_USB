@@ -12,6 +12,11 @@ row, note at the top of its section) that WSL2 and the distro must be installed 
 **Then `b3b1aee`: README only.** Also removed "What changed compared to the PowerShell version" (user request).
 **Then (committed and pushed): README only.** Intro no longer calls it a port of the PowerShell tool; the "same folder as the
 PowerShell version" bullet is gone (user request). The README now mentions PowerShell only as the shell.
+**LAST COMMIT (2026-09-28, pushed): VERSION 2.2.1, ReiserFS / Reiser4 removed from the code** (user request). FileSystems.cs: no
+FsKind, probe, NoDriverHint text or KernelKinds entry; build script: no reiserfs argument, config options or skip path.
+Clean Release build (0 warnings), `LinuxUsbMounter-2.2.1-Setup.exe` / `-Portable.zip`; reflection: FsKind lists no Reiser
+kind, a ReiserFS magic at 64 KiB now probes as nothing; `sh -n` on the script OK. Script not run in WSL (the lines removed
+were no-ops on 6.18). CLAUDE.md updated.
 
 _**Next: ① (done: committed, pushed)** **② run the 2.2.0 setup over the 2.0.0 install** (Update; Linux check says
 Tumbleweed is ready) **③ uninstall test** with a drive mounted (and, on a test PC, with a setup-installed distro) **④ the
@@ -20,8 +25,7 @@ earlier run list**._
 > ### 1. GOAL
 > **Enduring:** a standalone Windows tool that mounts Linux/Mac/BSD-formatted USB drives through WSL2 (`wsl --mount`): btrfs,
 > ext2/3/4, XFS read/write with the stock kernel; JFS, HFS+, ZFS, APFS, UFS through modules built by
-> `tools/build-wsl-modules.sh`; APFS read-only through fsapfsmount otherwise; ReiserFS on kernels before 6.13; Reiser4
-> detect-only. Safe eject. Never blocks the UI thread; every wsl.exe call has a timeout and honours cancellation.
+> `tools/build-wsl-modules.sh`; APFS read-only through fsapfsmount otherwise. Safe eject. Never blocks the UI thread; every wsl.exe call has a timeout and honours cancellation.
 > **Now:** the uninstaller offers to remove the WSL distro setup installed (user request 2026-09-26), version 2.2.0.
 
 > ### 2. STATE
