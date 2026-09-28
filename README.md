@@ -280,22 +280,6 @@ Redirected output (`LinuxUsbMounter --list > drives.txt`, or a program reading i
 uninstaller does with `--unmount-all`) goes to the file or pipe, with no console window.
 Exit code 0 = success.
 
-## What changed compared to the PowerShell version
-
-| Area | PowerShell | C# |
-|---|---|---|
-| Background work | extra runspace + log queue + polling timer | `async`/`await`, `Task`, `CancellationToken` |
-| Admin rights | self-elevation, execution-policy bypass, `.cmd` launcher | `requireAdministrator` manifest |
-| Second launch | detect, then offer to end the other copy | asks the running copy to **show its window**; only if it doesn't respond (hung, or the old script) offers to end it |
-| One-item lists | the quirk behind the startup bug | ordinary `List<T>` |
-| Device changes | separate hidden window compiled at runtime | the main window's own `WndProc` |
-| Startup task | `Register-ScheduledTask` | `schtasks /XML` (battery-safe settings, no extra modules) |
-| High DPI | system scaling | per-monitor v2 (`App.config`) |
-
-Behaviour is otherwise identical: flush with progress and Cancel on eject, unplugged-drive
-handling, keep-alive, superblock cache (sleeping drives stay asleep), scrub with live progress,
-read-only offline check with saved reports, tools installer, and no repair button by design.
-
 ## Project layout
 
 ```text

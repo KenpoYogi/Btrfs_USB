@@ -8,7 +8,13 @@
 
 ---
 
-## ⭐ (this commit) — **README: MIGRATION / UPGRADE SECTIONS REMOVED; PORTABLE = SET UP LINUX YOURSELF.** _2026-09-28. Evidence: user request ("remove the \"Migrating from the PowerShell version\" section and the \"Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe\" section from the README"; "make it clear that if the \"Portable\" version is installed, the user must do a manual install and setup of the linux distros in WSL"). Docs only, no build._
+## ⭐ (this commit) — **README: "WHAT CHANGED COMPARED TO THE POWERSHELL VERSION" REMOVED.** _2026-09-28. Evidence: user request ("Also remove \"What changed compared to the PowerShell version\" section from the README"). Docs only, no build._
+
+- **Removed:** the comparison table and the "Behaviour is otherwise identical" paragraph (nothing linked to them).
+
+---
+
+## ⭐ `54ef01f` — **README: MIGRATION / UPGRADE SECTIONS REMOVED; PORTABLE = SET UP LINUX YOURSELF.** _2026-09-28. Evidence: user request ("remove the \"Migrating from the PowerShell version\" section and the \"Upgrading from BtrfsUsbMounter.exe or XnixUsbMounter.exe\" section from the README"; "make it clear that if the \"Portable\" version is installed, the user must do a manual install and setup of the linux distros in WSL"). Docs only, no build._
 
 - **Removed:** the two README sections (nothing linked to them).
 - **Portable:** intro bullet, a new Install table row (Linux check: installer yes, portable no + guides link) and a note at
