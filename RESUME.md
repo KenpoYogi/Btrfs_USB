@@ -17,6 +17,8 @@ FsKind, probe, NoDriverHint text or KernelKinds entry; build script: no reiserfs
 Clean Release build (0 warnings), `LinuxUsbMounter-2.2.1-Setup.exe` / `-Portable.zip`; reflection: FsKind lists no Reiser
 kind, a ReiserFS magic at 64 KiB now probes as nothing; `sh -n` on the script OK. Script not run in WSL (the lines removed
 were no-ops on 6.18). CLAUDE.md updated.
+**Then (committed and pushed): main window title shows the version**, "Linux USB Mounter (2.2.1)" (user request; MainForm
+BuildUi, assembly version to 3 parts). Clean Release build; not seen on screen yet (the app needs elevation). Version stays 2.2.1.
 
 _**Next: ① (done: committed, pushed)** **② run the 2.2.0 setup over the 2.0.0 install** (Update; Linux check says
 Tumbleweed is ready) **③ uninstall test** with a drive mounted (and, on a test PC, with a setup-installed distro) **④ the

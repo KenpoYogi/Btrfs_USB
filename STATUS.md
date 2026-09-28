@@ -8,7 +8,14 @@
 
 ---
 
-## ⭐ (this commit) — **2.2.1: REISERFS AND REISER4 REMOVED FROM THE CODE.** _2026-09-28. Evidence: user request ("ReiserFS and Reiser4 are still mentioned in the code. Can you remove these references since they are no longer supported? Increment release to 2.2.1."). `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.2.1-Setup.exe / -Portable.zip. Reflection on the built exe: FsKind = Btrfs,Ext2,Ext3,Ext4,Xfs,Jfs,Zfs,HfsPlus,Apfs,Ufs; a buffer with ReIsEr2Fs at 64 KiB + 52 gives 0 signatures; assembly version 2.2.1.0. `sh -n` on the build script OK. NOT run: the script in WSL (the removed lines were no-ops on 6.18: no fs/reiserfs, no REISERFS_FS symbol)._
+## ⭐ (this commit) — **MAIN WINDOW TITLE SHOWS THE VERSION: "Linux USB Mounter (2.2.1)".** _2026-09-28. Evidence: user request ("put the build version in parenthesis in the dialogue title bar, to the right of the \"Linux USB Miunter\" text"). `dotnet build -c Release`: 0 warnings, 0 errors. NOT seen on screen (the app needs elevation)._
+
+- **MainForm.BuildUi:** title = UiKit.AppName + " (" + assembly version, 3 parts + ")". Message boxes, tray tooltip and the log
+  keep the plain name; the version number stays 2.2.1.
+
+---
+
+## ⭐ `3930751` — **2.2.1: REISERFS AND REISER4 REMOVED FROM THE CODE.** _2026-09-28. Evidence: user request ("ReiserFS and Reiser4 are still mentioned in the code. Can you remove these references since they are no longer supported? Increment release to 2.2.1."). `dotnet build -c Release`: 0 warnings, 0 errors, LinuxUsbMounter-2.2.1-Setup.exe / -Portable.zip. Reflection on the built exe: FsKind = Btrfs,Ext2,Ext3,Ext4,Xfs,Jfs,Zfs,HfsPlus,Apfs,Ufs; a buffer with ReIsEr2Fs at 64 KiB + 52 gives 0 signatures; assembly version 2.2.1.0. `sh -n` on the build script OK. NOT run: the script in WSL (the removed lines were no-ops on 6.18: no fs/reiserfs, no REISERFS_FS symbol)._
 
 - **FileSystems.cs:** FsKind.ReiserFs / Reiser4, their names, the two probes, the NoDriverHint texts, the Buildable and
   KernelKinds entries. A ReiserFS partition now shows as an unrecognised filesystem.

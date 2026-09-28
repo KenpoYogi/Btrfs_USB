@@ -99,7 +99,7 @@ namespace LinuxUsbMounter.UI
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96f, 96f);
             AutoScaleMode = AutoScaleMode.Dpi;
-            Text = UiKit.AppName;
+            Text = UiKit.AppName + " (" + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + ")";
             Size = new Size(1100, 680);
             MinimumSize = new Size(880, 520);
             StartPosition = FormStartPosition.CenterScreen;
